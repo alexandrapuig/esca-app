@@ -20,6 +20,7 @@ type AuthResult =
 
 type UserRow = {
   id: string;
+  auth_user_id: string;
   email: string;
   created_at: string;
 };
@@ -85,8 +86,14 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
 
   const { data: userRow, error: userError } = await supabase
     .from('users')
-    .upsert({ email: normalizedEmail }, { onConflict: 'email' })
-    .select('id, email, created_at')
+    .upsert(
+      {
+        auth_user_id: authData.user.id,
+        email: normalizedEmail,
+      },
+      { onConflict: 'auth_user_id' },
+    )
+    .select('id, auth_user_id, email, created_at')
     .single<UserRow>();
 
   if (userError || !userRow) {
