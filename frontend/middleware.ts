@@ -55,8 +55,9 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup');
   const isDashboardRoute = pathname.startsWith('/dashboard');
   const isInventoryRoute = pathname.startsWith('/inventory');
+  const isRecipesRoute = pathname.startsWith('/recipes');
 
-  if (!user && (isDashboardRoute || isInventoryRoute)) {
+  if (!user && (isDashboardRoute || isInventoryRoute || isRecipesRoute)) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/auth/login';
     redirectUrl.searchParams.set('redirectedFrom', pathname);
@@ -74,5 +75,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/inventory/:path*', '/auth/login', '/auth/signup'],
+  matcher: ['/dashboard/:path*', '/inventory/:path*', '/recipes/:path*', '/auth/login', '/auth/signup'],
 };

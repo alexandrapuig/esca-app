@@ -1,4 +1,6 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 type FridgeStatus = 'fresh' | 'consumed' | 'expired';
 type FridgeCategory =
@@ -19,6 +21,7 @@ type FridgeItemRow = {
   category: string | null;
   quantity: number | null;
   unit: string | null;
+  typical_shelf_life_days: number | null;
   purchase_date: string;
   estimated_expiry: string | null;
   status: string;
@@ -32,6 +35,7 @@ export type FridgeItem = {
   category: string | null;
   quantity: number | null;
   unit: string | null;
+  typicalShelfLifeDays: number | null;
   purchaseDate: string;
   estimatedExpiry: string | null;
   status: FridgeStatus;
@@ -51,30 +55,6 @@ type ServiceFailure = {
 
 type ServiceResult<T> = ServiceSuccess<T> | ServiceFailure;
 
-let supabaseAdminClient: SupabaseClient | null = null;
-
-function getSupabaseAdminClient(): SupabaseClient {
-  if (supabaseAdminClient) {
-    return supabaseAdminClient;
-  }
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error('Supabase credentials are not configured');
-  }
-
-  supabaseAdminClient = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  return supabaseAdminClient;
-}
-
 function mapFridgeItem(row: FridgeItemRow): FridgeItem {
   return {
     id: row.id,
@@ -83,6 +63,7 @@ function mapFridgeItem(row: FridgeItemRow): FridgeItem {
     category: row.category,
     quantity: row.quantity,
     unit: row.unit,
+    typicalShelfLifeDays: row.typical_shelf_life_days,
     purchaseDate: row.purchase_date,
     estimatedExpiry: row.estimated_expiry,
     status: (row.status as FridgeStatus) ?? 'fresh',
@@ -133,6 +114,7 @@ export async function createFridgeItem(params: {
   category?: string;
   quantity?: number;
   unit?: string;
+  typicalShelfLifeDays?: number;
 }): Promise<ServiceResult<FridgeItem>> {
   let supabase: SupabaseClient;
 
@@ -145,7 +127,13 @@ export async function createFridgeItem(params: {
 
   const purchaseDate = new Date();
   const normalizedCategory = normalizeCategory(params.category);
-  const estimatedExpiry = estimateExpiryDate(normalizedCategory, purchaseDate);
+  const shelfLifeDays =
+    typeof params.typicalShelfLifeDays === 'number' && Number.isFinite(params.typicalShelfLifeDays)
+      ? Math.max(1, Math.floor(params.typicalShelfLifeDays))
+      : null;
+  const estimatedExpiry = shelfLifeDays
+    ? new Date(purchaseDate.getTime() + shelfLifeDays * 24 * 60 * 60 * 1000)
+    : estimateExpiryDate(normalizedCategory, purchaseDate);
 
   const { data, error } = await supabase
     .from('fridge_items')
@@ -155,11 +143,14 @@ export async function createFridgeItem(params: {
       category: normalizedCategory,
       quantity: params.quantity ?? null,
       unit: params.unit?.trim() || null,
+      typical_shelf_life_days: shelfLifeDays,
       purchase_date: purchaseDate.toISOString(),
       estimated_expiry: estimatedExpiry.toISOString(),
       status: 'fresh',
     })
-    .select('id, user_id, name, category, quantity, unit, purchase_date, estimated_expiry, status, created_at')
+    .select(
+      'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at',
+    )
     .single<FridgeItemRow>();
 
   if (error || !data) {
@@ -191,7 +182,9 @@ export async function listFridgeItems(params: {
 
   let query = supabase
     .from('fridge_items')
-    .select('id, user_id, name, category, quantity, unit, purchase_date, estimated_expiry, status, created_at')
+    .select(
+      'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at',
+    )
     .eq('user_id', params.userId)
     .order('purchase_date', { ascending: false });
 
@@ -234,7 +227,9 @@ export async function updateFridgeItemStatus(params: {
     .update({ status: params.status })
     .eq('id', params.itemId)
     .eq('user_id', params.userId)
-    .select('id, user_id, name, category, quantity, unit, purchase_date, estimated_expiry, status, created_at')
+    .select(
+      'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at',
+    )
     .single<FridgeItemRow>();
 
   if (error) {

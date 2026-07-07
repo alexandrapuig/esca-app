@@ -13,6 +13,7 @@ type CreateFridgeItemBody = {
   category?: string;
   quantity?: number;
   unit?: string;
+  typical_shelf_life_days?: number;
 };
 
 type UpdateFridgeItemBody = {
@@ -45,6 +46,7 @@ router.post('/items', async (req, res) => {
     category?: string;
     quantity?: number;
     unit?: string;
+    typicalShelfLifeDays?: number;
   } = {
     userId: request.user.id,
     name: body.name,
@@ -60,6 +62,10 @@ router.post('/items', async (req, res) => {
 
   if (typeof body.unit === 'string') {
     createInput.unit = body.unit;
+  }
+
+  if (typeof body.typical_shelf_life_days === 'number') {
+    createInput.typicalShelfLifeDays = body.typical_shelf_life_days;
   }
 
   const result = await createFridgeItem(createInput);

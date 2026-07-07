@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 
-import { addFridgeItem } from '@/lib/api';
+import { addFridgeItem, identifyBarcode, type BarcodeIdentification } from '@/lib/api';
 
 const CATEGORIES = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverage', 'other'] as const;
 
@@ -25,6 +25,26 @@ function mapBarcodeToCategory(barcodeValue: string): string {
   return 'other';
 }
 
+function captureVideoFrameBase64(video: HTMLVideoElement): string | null {
+  if (!video.videoWidth || !video.videoHeight) {
+    return null;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    return null;
+  }
+
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  return dataUrl.replace(/^data:image\/jpeg;base64,/, '');
+}
+
 export default function AddInventoryItemPage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -37,7 +57,9 @@ export default function AddInventoryItemPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isIdentifying, setIsIdentifying] = useState(false);
   const [scanValue, setScanValue] = useState('');
+  const [identified, setIdentified] = useState<BarcodeIdentification | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -64,13 +86,37 @@ export default function AddInventoryItemPage() {
     try {
       const result = await codeReader.decodeOnceFromVideoDevice(undefined, videoRef.current);
       const scannedCode = result.getText();
+      const barcodeImage = captureVideoFrameBase64(videoRef.current);
       setScanValue(scannedCode);
 
-      if (!name.trim()) {
-        setName(`Item ${scannedCode.slice(-6)}`);
+      setIsIdentifying(true);
+      const identification = await identifyBarcode({
+        barcode: scannedCode,
+        barcodeImage: barcodeImage ?? undefined,
+      });
+
+      if (!identification.success) {
+        if (!name.trim()) {
+          setName(`Item ${scannedCode.slice(-6)}`);
+        }
+
+        setCategory(mapBarcodeToCategory(scannedCode) as (typeof CATEGORIES)[number]);
+        setErrorMessage(identification.error);
+      } else {
+        setIdentified(identification.data);
+
+        if (!name.trim()) {
+          setName(identification.data.name);
+        }
+
+        const identifiedCategory = CATEGORIES.includes(identification.data.category as (typeof CATEGORIES)[number])
+          ? (identification.data.category as (typeof CATEGORIES)[number])
+          : 'other';
+
+        setCategory(identifiedCategory);
       }
 
-      setCategory(mapBarcodeToCategory(scannedCode) as (typeof CATEGORIES)[number]);
+      setIsIdentifying(false);
       setIsScanning(false);
       codeReader.reset();
     } catch (error) {
@@ -81,6 +127,7 @@ export default function AddInventoryItemPage() {
       }
 
       setIsScanning(false);
+      setIsIdentifying(false);
       codeReader.reset();
     }
   }
@@ -114,6 +161,7 @@ export default function AddInventoryItemPage() {
       category,
       quantity: parsedQuantity,
       unit: unit.trim() || undefined,
+      typical_shelf_life_days: identified?.typical_shelf_life_days,
     });
 
     if (!result.success) {
@@ -222,9 +270,26 @@ export default function AddInventoryItemPage() {
               </div>
 
               {scanValue ? (
-                <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                  Scanned code: {scanValue}
-                </p>
+                <div className="mt-3 space-y-2">
+                  <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                    Scanned code: {scanValue}
+                  </p>
+                  {isIdentifying ? <p className="text-sm text-stone-600">Identifying product with AI...</p> : null}
+                  {identified ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                      <p>
+                        <span className="font-semibold">Identified product:</span> {identified.name}
+                      </p>
+                      <p>
+                        <span className="font-semibold">Category:</span> {identified.category}
+                      </p>
+                      <p>
+                        <span className="font-semibold">Estimated shelf life:</span> {identified.typical_shelf_life_days} days
+                      </p>
+                      <p className="mt-1 text-xs text-amber-800">You can still edit any field before saving.</p>
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
             </div>
 

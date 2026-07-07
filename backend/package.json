@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "tsc",
+    "dev": "nodemon src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -12,10 +14,12 @@
   "type": "commonjs",
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",
+    "@types/node-cron": "^3.0.11",
     "axios": "^1.18.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "node-cron": "^4.2.1",
     "typescript": "^6.0.3"
   },
   "devDependencies": {
