@@ -14,6 +14,8 @@ CREATE TABLE fridge_items (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   category TEXT,
+  quantity NUMERIC,
+  unit TEXT,
   purchase_date TIMESTAMP NOT NULL,
   estimated_expiry TIMESTAMP,
   status TEXT DEFAULT 'fresh',
@@ -37,6 +39,7 @@ CREATE INDEX idx_spoilage_user ON spoilage_predictions(user_id);
 
 -- Enable row-level security for Supabase auth
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fridge_items ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view their own profile"
 ON users
@@ -56,3 +59,58 @@ FOR UPDATE
 TO authenticated
 USING (auth.uid() = auth_user_id)
 WITH CHECK (auth.uid() = auth_user_id);
+
+CREATE POLICY "Users can view their own fridge items"
+ON fridge_items
+FOR SELECT
+TO authenticated
+USING (
+  user_id IN (
+    SELECT id
+    FROM users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Users can create their own fridge items"
+ON fridge_items
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  user_id IN (
+    SELECT id
+    FROM users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Users can update their own fridge items"
+ON fridge_items
+FOR UPDATE
+TO authenticated
+USING (
+  user_id IN (
+    SELECT id
+    FROM users
+    WHERE auth_user_id = auth.uid()
+  )
+)
+WITH CHECK (
+  user_id IN (
+    SELECT id
+    FROM users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Users can delete their own fridge items"
+ON fridge_items
+FOR DELETE
+TO authenticated
+USING (
+  user_id IN (
+    SELECT id
+    FROM users
+    WHERE auth_user_id = auth.uid()
+  )
+);

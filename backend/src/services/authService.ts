@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-type AuthenticatedUser = {
+export type AuthenticatedUser = {
   id: string;
   authUserId: string;
   email: string;
