@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Esca",
+    "slug": "esca-app",
+    "version": "1.0.0",
+    "scheme": "esca",
+    "ios": {
+      "bundleIdentifier": "com.escawaste.esca"
+    },
+    "android": {
+      "package": "com.escawaste.esca"
+    },
+    "plugins": [
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Allow Esca to access your camera to scan barcodes."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Esca to access your photos.",
+          "cameraPermission": "Allow Esca to access your camera."
+        }
+      ]
+    ]
+  }
+}
