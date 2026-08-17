@@ -38,7 +38,7 @@ export default function DashboardPage() {
       const { data, error } = await supabase
         .from('users')
         .select('id, email, created_at')
-        .eq('auth_user_id', user.id)
+        .eq('id', user.id)
         .single<UserProfile>();
 
       if (error) {
