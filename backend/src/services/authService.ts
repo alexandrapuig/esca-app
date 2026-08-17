@@ -1,10 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 export type AuthenticatedUser = {
   id: string;
-  authUserId: string;
   email: string;
   createdAt: string;
 };
@@ -22,7 +20,6 @@ type AuthResult =
 
 type UserRow = {
   id: string;
-  auth_user_id: string;
   email: string;
   created_at: string;
 };
@@ -37,12 +34,10 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
   }
 
   let supabase: SupabaseClient;
-
   try {
     supabase = getSupabaseAdminClient();
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Supabase is not configured';
-
     return {
       success: false,
       status: 500,
@@ -51,7 +46,6 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
   }
 
   const { data: authData, error: authError } = await supabase.auth.getUser(accessToken);
-
   if (authError || !authData.user?.email) {
     return {
       success: false,
@@ -66,12 +60,12 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
     .from('users')
     .upsert(
       {
-        auth_user_id: authData.user.id,
+        id: authData.user.id,
         email: normalizedEmail,
       },
-      { onConflict: 'auth_user_id' },
+      { onConflict: 'id' },
     )
-    .select('id, auth_user_id, email, created_at')
+    .select('id, email, created_at')
     .single<UserRow>();
 
   if (userError || !userRow) {
@@ -86,7 +80,6 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
     success: true,
     data: {
       id: userRow.id,
-      authUserId: authData.user.id,
       email: userRow.email,
       createdAt: userRow.created_at,
     },
