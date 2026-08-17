@@ -60,10 +60,10 @@ export async function ensureUserProfile(user: User | null): Promise<void> {
 
   await supabase.from('users').upsert(
     {
-      auth_user_id: user.id,
+      id: user.id,
       email: user.email.trim().toLowerCase(),
     },
-    { onConflict: 'auth_user_id' },
+    { onConflict: 'id' },
   );
 }
 
