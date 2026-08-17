@@ -18,7 +18,7 @@ async function runPredictionJob() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { data: users, error } = await supabase.from('users').select('id, auth_user_id');
+  const { data: users, error } = await supabase.from('users').select('id');
 
   if (error) {
     throw new Error(error.message);
