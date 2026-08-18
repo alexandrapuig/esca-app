@@ -24,6 +24,40 @@ type UserRow = {
   created_at: string;
 };
 
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchUserWithRetry(
+  supabase: SupabaseClient,
+  userId: string,
+  maxAttempts: number = 5,
+  delayMs: number = 200
+): Promise<{ data: UserRow | null; error: any }> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const { data: userRow, error: userError } = await supabase
+      .from('public.users')
+      .select('id, email, created_at')
+      .eq('id', userId)
+      .single<UserRow>();
+
+    // Success - user found
+    if (!userError && userRow) {
+      return { data: userRow, error: null };
+    }
+
+    // Last attempt - return the error
+    if (attempt === maxAttempts) {
+      return { data: null, error: userError };
+    }
+
+    // Not the last attempt - wait and retry
+    await sleep(delayMs);
+  }
+
+  return { data: null, error: 'Max retries exceeded' };
+}
+
 export async function authenticateUser(accessToken: string): Promise<AuthResult> {
   if (!accessToken) {
     return {
@@ -56,12 +90,13 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
 
   const normalizedEmail = authData.user.email.trim().toLowerCase();
 
-  // Just fetch the user that was already created by the trigger
-  const { data: userRow, error: userError } = await supabase
-    .from('public.users')
-    .select('id, email, created_at')
-    .eq('id', authData.user.id)
-    .single<UserRow>();
+  // Fetch user with retry logic to wait for trigger to fire
+  const { data: userRow, error: userError } = await fetchUserWithRetry(
+    supabase,
+    authData.user.id,
+    5, // max 5 attempts
+    200 // 200ms delay between attempts
+  );
 
   if (userError || !userRow) {
     return {
