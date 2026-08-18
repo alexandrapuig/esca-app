@@ -56,7 +56,7 @@ export type RecipeSuggestion = {
 };
 
 function getBackendUrl(): string {
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL;
 
   if (backendUrl) {
     return backendUrl;
