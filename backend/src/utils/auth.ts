@@ -1,5 +1,4 @@
 import type { Request, Response, NextFunction } from 'express';
-
 import { authenticateUser, type AuthenticatedUser } from '../services/authService';
 
 type AuthRequestBody = {
@@ -10,17 +9,19 @@ export type AuthenticatedRequest = Request & {
   user: AuthenticatedUser;
 };
 
-function getAccessToken(authorizationHeader: string | undefined, body: AuthRequestBody): string | null {
-  if (body.accessToken) {
+function getAccessToken(authorizationHeader: string | undefined, body: AuthRequestBody | undefined): string | null {
+  // Check if token is in request body
+  if (body?.accessToken) {
     return body.accessToken;
   }
 
+  // Check if Authorization header exists
   if (!authorizationHeader) {
     return null;
   }
 
+  // Parse Bearer token from header
   const [scheme, token] = authorizationHeader.split(' ');
-
   if (scheme?.toLowerCase() !== 'bearer' || !token) {
     return null;
   }
@@ -29,7 +30,10 @@ function getAccessToken(authorizationHeader: string | undefined, body: AuthReque
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const accessToken = getAccessToken(req.header('authorization'), req.body as AuthRequestBody);
+  const accessToken = getAccessToken(
+    req.header('authorization'),
+    req.body as AuthRequestBody | undefined
+  );
 
   if (!accessToken) {
     res.status(401).json({
