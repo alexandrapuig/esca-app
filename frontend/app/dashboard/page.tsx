@@ -38,29 +38,46 @@ export default function DashboardPage() {
         // Get access token from Supabase session
         const supabase = getSupabaseClient();
         const { data: { session } } = await supabase.auth.getSession();
+        
+        console.log('=== Dashboard Debug ===');
+        console.log('Current User:', user);
+        console.log('Session:', session);
+        console.log('Access Token:', session?.access_token);
+        
         const accessToken = session?.access_token;
 
         if (!accessToken) {
-          setErrorMessage('No access token available');
+          setErrorMessage('No access token available - session not found');
           setIsLoading(false);
+          console.error('No access token found in session');
           return;
         }
 
+        console.log('Calling backend with token:', accessToken.substring(0, 20) + '...');
+
         // Call backend API to fetch user profile
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/profile`, {
+          method: 'GET',
           headers: {
-            'Authorization': `Bearer ${accessToken}`
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
           }
         });
 
+        console.log('Backend response status:', response.status);
+        
+        const responseData = await response.json();
+        console.log('Backend response data:', responseData);
+
         if (!response.ok) {
-          throw new Error('Failed to fetch user profile');
+          throw new Error(responseData.error || 'Failed to fetch user profile');
         }
 
-        const data = await response.json();
-        setProfile(data);
+        setProfile(responseData);
+        console.log('Successfully set profile:', responseData);
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Unknown error');
+        console.error('Error in loadDashboard:', error);
         setErrorMessage(error.message);
       } finally {
         setIsLoading(false);
