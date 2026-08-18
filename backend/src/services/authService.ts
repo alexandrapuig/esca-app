@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 export type AuthenticatedUser = {
@@ -18,46 +17,6 @@ type AuthResult =
       error: string;
     };
 
-type UserRow = {
-  id: string;
-  email: string;
-  created_at: string;
-};
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchUserWithRetry(
-  supabase: SupabaseClient,
-  userId: string,
-  maxAttempts: number = 5,
-  delayMs: number = 200
-): Promise<{ data: UserRow | null; error: any }> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const { data: userRow, error: userError } = await supabase
-      .from('public.users')
-      .select('id, email, created_at')
-      .eq('id', userId)
-      .single<UserRow>();
-
-    // Success - user found
-    if (!userError && userRow) {
-      return { data: userRow, error: null };
-    }
-
-    // Last attempt - return the error
-    if (attempt === maxAttempts) {
-      return { data: null, error: userError };
-    }
-
-    // Not the last attempt - wait and retry
-    await sleep(delayMs);
-  }
-
-  return { data: null, error: 'Max retries exceeded' };
-}
-
 export async function authenticateUser(accessToken: string): Promise<AuthResult> {
   if (!accessToken) {
     return {
@@ -67,7 +26,7 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
     };
   }
 
-  let supabase: SupabaseClient;
+  let supabase: ReturnType<typeof getSupabaseAdminClient>;
   try {
     supabase = getSupabaseAdminClient();
   } catch (error) {
@@ -88,17 +47,35 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
     };
   }
 
+  const now = new Date().toISOString();
   const normalizedEmail = authData.user.email.trim().toLowerCase();
 
-  // Fetch user with retry logic to wait for trigger to fire
-  const { data: userRow, error: userError } = await fetchUserWithRetry(
-    supabase,
-    authData.user.id,
-    5, // max 5 attempts
-    200 // 200ms delay between attempts
-  );
+  // Idempotently provision the app-level user record.
+  // Do not rely solely on DB triggers — they may be absent or fail silently per environment.
+  const { data: upsertedRow, error: upsertError } = await supabase
+    .from('users')
+    .upsert(
+      {
+        auth_user_id: authData.user.id,
+        email: normalizedEmail,
+        updated_at: now,
+      },
+      { onConflict: 'auth_user_id' }
+    )
+    .select('id, created_at')
+    .single();
 
-  if (userError || !userRow) {
+  if (upsertError || !upsertedRow) {
+    console.error('unable to provision user record', {
+      auth_user_id: authData.user.id,
+      auth_email: normalizedEmail,
+      code: (upsertError as any)?.code,
+      message: upsertError?.message,
+      details: (upsertError as any)?.details,
+      hint: (upsertError as any)?.hint,
+      table: 'users',
+    });
+
     return {
       success: false,
       status: 500,
@@ -109,9 +86,9 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
   return {
     success: true,
     data: {
-      id: userRow.id,
-      email: userRow.email,
-      createdAt: userRow.created_at,
+      id: upsertedRow.id,
+      email: normalizedEmail,
+      createdAt: upsertedRow.created_at ?? now,
     },
   };
 }
