@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth } from '../utils/auth';
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 const router = Router();
