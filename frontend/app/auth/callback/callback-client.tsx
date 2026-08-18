@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-
-import { ensureUserProfile, getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 
 export default function CallbackClient() {
   const router = useRouter();
@@ -14,33 +13,32 @@ export default function CallbackClient() {
 
   useEffect(() => {
     async function finishAuth() {
-      const authCode = searchParams.get('code');
-      const authError = searchParams.get('error_description') ?? searchParams.get('error');
+      try {
+        const supabase = getSupabaseClient();
 
-      if (authError) {
-        setErrorMessage(authError);
+        // Let Supabase automatically handle the hash and create session
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          setErrorMessage(error.message);
+          setStatusMessage('We could not verify your account.');
+          return;
+        }
+
+        if (!session) {
+          setErrorMessage('No session found. Please try logging in again.');
+          setStatusMessage('We could not verify your account.');
+          return;
+        }
+
+        // Session is now created, just redirect to dashboard
+        router.replace('/dashboard');
+        router.refresh();
+      } catch (err) {
+        const error = err instanceof Error ? err.message : 'An unknown error occurred';
+        setErrorMessage(error);
         setStatusMessage('We could not verify your account.');
-        return;
       }
-
-      if (!authCode) {
-        setErrorMessage('Missing verification code. Request a new confirmation email and try again.');
-        setStatusMessage('We could not verify your account.');
-        return;
-      }
-
-      const supabase = getSupabaseClient();
-      const { data, error } = await supabase.auth.exchangeCodeForSession(authCode);
-
-      if (error) {
-        setErrorMessage(error.message);
-        setStatusMessage('We could not verify your account.');
-        return;
-      }
-
-      await ensureUserProfile(data.user);
-      router.replace('/dashboard');
-      router.refresh();
     }
 
     void finishAuth();
@@ -51,7 +49,6 @@ export default function CallbackClient() {
       <p className="text-sm uppercase tracking-[0.35em] text-amber-700">Auth callback</p>
       <h1 className="mt-5 text-3xl font-semibold tracking-tight">Confirming your account</h1>
       <p className="mt-4 text-base leading-7 text-stone-600">{statusMessage}</p>
-
       {errorMessage ? (
         <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-left text-sm leading-6 text-red-700">
           {errorMessage}
@@ -59,7 +56,6 @@ export default function CallbackClient() {
       ) : (
         <div className="mx-auto mt-8 h-12 w-12 animate-spin rounded-full border-4 border-stone-200 border-t-amber-600" />
       )}
-
       {errorMessage ? (
         <Link
           className="mt-8 inline-flex rounded-full bg-stone-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-stone-700"
