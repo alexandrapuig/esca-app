@@ -1,3 +1,9 @@
+// ============================================================================
+// STEP 2A: src/services/authService.ts
+// Copy this ENTIRE file and replace your existing authService.ts
+// Run this AFTER Step 1 (database migration) completes
+// ============================================================================
+
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 export type AuthenticatedUser = {
@@ -52,13 +58,17 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
 
   // Idempotently provision the app-level user record.
   // Do not rely solely on DB triggers — they may be absent or fail silently per environment.
+  
+  // FIX #1: Removed 'updated_at' column which doesn't exist in the users table schema
+  // The users table only has: id, auth_user_id, email, dietary_restrictions, cuisine_preferences, created_at
+  // No updated_at column exists, so we only upsert the columns that actually exist
   const { data: upsertedRow, error: upsertError } = await supabase
     .from('users')
     .upsert(
       {
         auth_user_id: authData.user.id,
         email: normalizedEmail,
-        updated_at: now,
+        // REMOVED: updated_at: now (this column doesn't exist)
       },
       { onConflict: 'auth_user_id' }
     )
@@ -75,7 +85,6 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
       hint: (upsertError as any)?.hint,
       table: 'users',
     });
-
     return {
       success: false,
       status: 500,
