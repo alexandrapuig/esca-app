@@ -35,11 +35,24 @@ export default function DashboardPage() {
       await ensureUserProfile(user);
 
       const supabase = getSupabaseClient();
-      const { data, error } = await supabase
-        .from('public.users')
-        .select('id, email, created_at')
-        .eq('id', user.id)
-        .single<UserProfile>();
+      const accessToken = session?.access_token;
+
+if (!accessToken) {
+  return res.status(401).json({ error: 'No access token' });
+}
+
+const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/profile`, {
+  headers: {
+    'Authorization': `Bearer ${accessToken}`
+  }
+});
+
+if (!response.ok) {
+  throw new Error('Failed to fetch user profile');
+}
+
+const data = await response.json();
+const error = null;
 
       if (error) {
         setErrorMessage(error.message);
