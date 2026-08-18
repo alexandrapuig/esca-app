@@ -23,44 +23,48 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function loadDashboard() {
-      const user = await getCurrentUser();
+      try {
+        const user = await getCurrentUser();
 
-      if (!user?.email) {
-        router.replace('/auth/login');
-        return;
-      }
+        if (!user?.email) {
+          router.replace('/auth/login');
+          return;
+        }
 
-      setUserEmail(user.email);
-      setAuthUserId(user.id);
-      await ensureUserProfile(user);
+        setUserEmail(user.email);
+        setAuthUserId(user.id);
+        await ensureUserProfile(user);
 
-      const supabase = getSupabaseClient();
-      const accessToken = session?.access_token;
+        // Get access token from Supabase session
+        const supabase = getSupabaseClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
 
-if (!accessToken) {
-  return res.status(401).json({ error: 'No access token' });
-}
+        if (!accessToken) {
+          setErrorMessage('No access token available');
+          setIsLoading(false);
+          return;
+        }
 
-const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/profile`, {
-  headers: {
-    'Authorization': `Bearer ${accessToken}`
-  }
-});
+        // Call backend API to fetch user profile
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/profile`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
 
-if (!response.ok) {
-  throw new Error('Failed to fetch user profile');
-}
+        if (!response.ok) {
+          throw new Error('Failed to fetch user profile');
+        }
 
-const data = await response.json();
-const error = null;
-
-      if (error) {
-        setErrorMessage(error.message);
-      } else {
+        const data = await response.json();
         setProfile(data);
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Unknown error');
+        setErrorMessage(error.message);
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     }
 
     void loadDashboard();
