@@ -18,11 +18,7 @@ type AuthResult =
     };
 
 export async function authenticateUser(accessToken: string): Promise<AuthResult> {
-  console.log('[authService] authenticateUser called');
-  console.log('[authService] Token present:', !!accessToken);
-
   if (!accessToken) {
-    console.log('[authService] ERROR: No access token provided');
     return {
       success: false,
       status: 400,
@@ -32,12 +28,9 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
 
   let supabase: ReturnType<typeof getSupabaseAdminClient>;
   try {
-    console.log('[authService] Getting Supabase admin client...');
     supabase = getSupabaseAdminClient();
-    console.log('[authService] Supabase admin client obtained');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Supabase is not configured';
-    console.error('[authService] ERROR getting Supabase client:', message);
     return {
       success: false,
       status: 500,
@@ -45,16 +38,9 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
     };
   }
 
-  console.log('[authService] Calling supabase.auth.getUser...');
   const { data: authData, error: authError } = await supabase.auth.getUser(accessToken);
-  
-  console.log('[authService] Auth response received');
-  console.log('[authService] Auth error:', authError?.message || 'none');
-  console.log('[authService] Auth user ID:', authData.user?.id || 'missing');
-  console.log('[authService] Auth user email:', authData.user?.email || 'missing');
 
   if (authError || !authData.user?.email) {
-    console.error('[authService] ERROR: Invalid token or missing email');
     return {
       success: false,
       status: 401,
@@ -65,11 +51,10 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
   const now = new Date().toISOString();
   const normalizedEmail = authData.user.email.trim().toLowerCase();
 
-  console.log('[authService] Normalized email:', normalizedEmail);
-  console.log('[authService] Attempting to upsert user...');
-
-  // Idempotently provision the app-level user record.
-  // Do not rely solely on DB triggers — they may be absent or fail silently per environment.
+  // Provisions the app-level user record. This is the ONLY provisioning path:
+  // the on_auth_user_created trigger was dropped on 2026-08-18 because it was
+  // aborting signups. Every authenticated request upserts idempotently, so the
+  // row is created on the user's first authenticated call after signup.
   const { data: upsertedRow, error: upsertError } = await supabase
     .from('users')
     .upsert(
@@ -82,14 +67,9 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
     .select('id, created_at')
     .single();
 
-  console.log('[authService] Upsert response received');
-  console.log('[authService] Upsert error:', upsertError?.message || 'none');
-  console.log('[authService] Upserted row ID:', upsertedRow?.id || 'missing');
-
   if (upsertError || !upsertedRow) {
     console.error('unable to provision user record', {
       auth_user_id: authData.user.id,
-      auth_email: normalizedEmail,
       code: (upsertError as any)?.code,
       message: upsertError?.message,
       details: (upsertError as any)?.details,
@@ -102,9 +82,6 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
       error: 'Unable to provision user record',
     };
   }
-
-  console.log('[authService] User provisioning successful');
-  console.log('[authService] User ID:', upsertedRow.id);
 
   return {
     success: true,
