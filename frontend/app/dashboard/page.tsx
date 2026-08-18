@@ -36,7 +36,7 @@ export default function DashboardPage() {
 
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
-        .from('users')
+        .from('public.users')
         .select('id, email, created_at')
         .eq('id', user.id)
         .single<UserProfile>();
