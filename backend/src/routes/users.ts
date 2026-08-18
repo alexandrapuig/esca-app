@@ -15,7 +15,7 @@ router.get('/profile', requireAuth, async (req: Request, res: Response) => {
     const supabase = getSupabaseAdminClient();
 
     const { data, error } = await supabase
-      .from('users')
+      .from('public.users')
       .select('id, email, dietary_restrictions, cuisine_preferences, created_at')
       .eq('id', userId)
       .single();
