@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 
 import authRoutes from './routes/auth';
-import userRoutes from './routes/users';
+import usersRoutes from './routes/users';
 import barcodeRoutes from './routes/barcode';
 import fridgeRoutes from './routes/fridge';
 import predictionsRoutes from './routes/predictions';
