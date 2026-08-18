@@ -57,7 +57,7 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
   const normalizedEmail = authData.user.email.trim().toLowerCase();
 
   const { data: userRow, error: userError } = await supabase
-    .from('users')
+    .from('public.users')
     .upsert(
       {
         id: authData.user.id,
