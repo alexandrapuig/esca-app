@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 
 import authRoutes from './routes/auth';
+import userRoutes from './routes/users';
 import barcodeRoutes from './routes/barcode';
 import fridgeRoutes from './routes/fridge';
 import predictionsRoutes from './routes/predictions';
@@ -16,6 +17,7 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 app.use('/auth', authRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/fridge', fridgeRoutes);
 app.use('/api/barcode', barcodeRoutes);
 app.use('/api/predictions', predictionsRoutes);
