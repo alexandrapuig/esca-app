@@ -56,16 +56,11 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
 
   const normalizedEmail = authData.user.email.trim().toLowerCase();
 
+  // Just fetch the user that was already created by the trigger
   const { data: userRow, error: userError } = await supabase
     .from('public.users')
-    .upsert(
-      {
-        id: authData.user.id,
-        email: normalizedEmail,
-      },
-      { onConflict: 'id' },
-    )
     .select('id, email, created_at')
+    .eq('id', authData.user.id)
     .single<UserRow>();
 
   if (userError || !userRow) {
