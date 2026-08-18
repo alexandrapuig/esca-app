@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { ensureUserProfile, getCurrentUser, getSupabaseClient, signOut } from '@/lib/supabase';
+import { getCurrentUser, getSupabaseClient, signOut } from '@/lib/supabase';
 
 type UserProfile = {
   id: string;
@@ -33,27 +33,18 @@ export default function DashboardPage() {
 
         setUserEmail(user.email);
         setAuthUserId(user.id);
-        await ensureUserProfile(user);
 
         // Get access token from Supabase session
         const supabase = getSupabaseClient();
         const { data: { session } } = await supabase.auth.getSession();
         
-        console.log('=== Dashboard Debug ===');
-        console.log('Current User:', user);
-        console.log('Session:', session);
-        console.log('Access Token:', session?.access_token);
-        
         const accessToken = session?.access_token;
 
         if (!accessToken) {
-          setErrorMessage('No access token available - session not found');
+          setErrorMessage('No access token available');
           setIsLoading(false);
-          console.error('No access token found in session');
           return;
         }
-
-        console.log('Calling backend with token:', accessToken.substring(0, 20) + '...');
 
         // Call backend API to fetch user profile
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/profile`, {
@@ -64,20 +55,15 @@ export default function DashboardPage() {
           }
         });
 
-        console.log('Backend response status:', response.status);
-        
-        const responseData = await response.json();
-        console.log('Backend response data:', responseData);
-
         if (!response.ok) {
+          const responseData = await response.json();
           throw new Error(responseData.error || 'Failed to fetch user profile');
         }
 
+        const responseData = await response.json();
         setProfile(responseData);
-        console.log('Successfully set profile:', responseData);
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Unknown error');
-        console.error('Error in loadDashboard:', error);
         setErrorMessage(error.message);
       } finally {
         setIsLoading(false);
@@ -156,12 +142,12 @@ export default function DashboardPage() {
               </div>
               <div className="rounded-[1.5rem] bg-stone-100 p-5">
                 <p className="text-sm text-stone-500">Profile row ID</p>
-                <p className="mt-3 break-all text-sm font-medium text-stone-900">{profile?.id ?? 'Not loaded'}</p>
+                <p className="mt-3 break-all text-sm font-medium text-stone-900">{profile?.id ?? 'Loading...'}</p>
               </div>
               <div className="rounded-[1.5rem] bg-stone-100 p-5">
                 <p className="text-sm text-stone-500">Created</p>
                 <p className="mt-3 text-sm font-medium text-stone-900">
-                  {profile?.created_at ? new Date(profile.created_at).toLocaleString() : 'Not loaded'}
+                  {profile?.created_at ? new Date(profile.created_at).toLocaleString() : 'Loading...'}
                 </p>
               </div>
             </div>
