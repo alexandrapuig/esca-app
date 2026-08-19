@@ -23,6 +23,16 @@ app.use('/api/barcode', barcodeRoutes);
 app.use('/api/predictions', predictionsRoutes);
 app.use('/api/recipes', recipesRoutes);
 
+app.get('/debug/env', (_req, res) => {
+  res.json({
+    hasUrl: !!process.env.SUPABASE_URL,
+    hasServiceKey: !!process.env.SUPABASE_SERVICE_KEY,
+    supabaseVarNames: Object.keys(process.env).filter((k) =>
+      k.toUpperCase().includes('SUPA')
+    ),
+  });
+});
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
