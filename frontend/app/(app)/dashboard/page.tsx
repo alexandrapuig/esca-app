@@ -55,13 +55,13 @@ export default function DashboardPage() {
           }
         });
 
-        if (!response.ok) {
-          const responseData = await response.json();
-          throw new Error(responseData.error || 'Failed to fetch user profile');
+        const payload = (await response.json()) as { success: boolean; data?: UserProfile; error?: string };
+
+        if (!response.ok || !payload.success || !payload.data) {
+          throw new Error(payload.error || 'Failed to fetch user profile');
         }
 
-        const responseData = await response.json();
-        setProfile(responseData);
+        setProfile(payload.data);
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Unknown error');
         setErrorMessage(error.message);

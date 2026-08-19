@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   auth_user_id         uuid NOT NULL UNIQUE,
   email                text NOT NULL UNIQUE,
+  name                 text,
   dietary_restrictions text[] DEFAULT ARRAY[]::text[],
   cuisine_preferences  text[] DEFAULT ARRAY[]::text[],
   created_at           timestamp without time zone DEFAULT now()

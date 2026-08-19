@@ -2,6 +2,7 @@ export interface User {
   id: string;
   email: string;
   created_at: string;
+  name?: string | null;
   dietary_restrictions?: string[];
   notification_preferences?: Record<string, boolean>;
 }

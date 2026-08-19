@@ -1,54 +1,75 @@
-// ============================================================================
-// STEP 2B: src/routes/users.ts
-// Copy this ENTIRE file and replace your existing routes/users.ts
-// Run this AFTER Step 1 (database migration) completes
-// ============================================================================
+import { Router, type Request } from 'express';
 
-import { Router, Request, Response } from 'express';
-import { requireAuth } from '../utils/auth';
-import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
+import { getUserProfile, getUserStats, updateUserProfile } from '../services/userService';
+import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
+
+type UpdateProfileBody = {
+  name?: string;
+  dietary_restrictions?: string[];
+};
 
 const router = Router();
 
-router.get('/profile', requireAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user?.id;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID not found in request' });
-    }
+router.use(requireAuth);
 
-    const supabase = getSupabaseAdminClient();
-    
-    // FIX #2: cuisine_preferences column now exists in schema
-    // This column was previously missing from the users table schema
-    // Now that Step 1 (database migration) has run, this column exists and contains
-    // the user's preferred cuisine types as a TEXT[] array
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, email, dietary_restrictions, cuisine_preferences, created_at')
-      .eq('id', userId)
-      .single();
+function getAuthenticatedRequest(req: Request): AuthenticatedRequest {
+  return req as unknown as AuthenticatedRequest;
+}
 
-    if (error) {
-      return res.status(400).json({ 
-        error: 'Supabase query failed',
-        details: error.message
-      });
-    }
+router.get('/profile', async (req, res) => {
+  const request = getAuthenticatedRequest(req);
+  const result = await getUserProfile(request.user.id);
 
-    if (!data) {
-      return res.status(404).json({ error: 'User profile not found' });
-    }
-
-    res.json(data);
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ 
-      error: 'Failed to fetch user profile',
-      details: errorMessage
+  if (!result.success) {
+    res.status(result.status).json({
+      success: false,
+      error: result.error,
     });
+    return;
   }
+
+  res.status(200).json({
+    success: true,
+    data: result.data,
+  });
+});
+
+router.put('/profile', async (req, res) => {
+  const body = req.body as UpdateProfileBody;
+  const request = getAuthenticatedRequest(req);
+
+  const result = await updateUserProfile(request.user.id, body);
+
+  if (!result.success) {
+    res.status(result.status).json({
+      success: false,
+      error: result.error,
+    });
+    return;
+  }
+
+  res.status(200).json({
+    success: true,
+    data: result.data,
+  });
+});
+
+router.get('/stats', async (req, res) => {
+  const request = getAuthenticatedRequest(req);
+  const result = await getUserStats(request.user.id);
+
+  if (!result.success) {
+    res.status(result.status).json({
+      success: false,
+      error: result.error,
+    });
+    return;
+  }
+
+  res.status(200).json({
+    success: true,
+    data: result.data,
+  });
 });
 
 export default router;

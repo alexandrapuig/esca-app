@@ -8,6 +8,7 @@ const links = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/inventory', label: 'Inventory' },
   { href: '/recipes', label: 'Recipes' },
+  { href: '/profile', label: 'Profile' },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

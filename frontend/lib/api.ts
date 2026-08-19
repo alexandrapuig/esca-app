@@ -32,6 +32,21 @@ export type BarcodeIdentification = {
   typical_shelf_life_days: number;
 };
 
+export type UserProfile = {
+  id: string;
+  email: string;
+  name: string | null;
+  dietary_restrictions: string[];
+  created_at: string;
+};
+
+export type UserStats = {
+  items_consumed_count: number;
+  waste_prevented_kg: number;
+  co2_saved_kg: number;
+  money_saved: number;
+};
+
 export type SpoilagePrediction = {
   item_id: string;
   risk_level: 'low' | 'medium' | 'high';
@@ -166,6 +181,24 @@ export async function deleteFridgeItem(id: string): Promise<ApiResult<{ deleted:
     success: true,
     data: { deleted: true },
   };
+}
+
+export async function getUserProfile(): Promise<ApiResult<UserProfile>> {
+  return apiRequest<UserProfile>('/api/users/profile', { method: 'GET' });
+}
+
+export async function updateUserProfile(input: {
+  name?: string;
+  dietary_restrictions?: string[];
+}): Promise<ApiResult<UserProfile>> {
+  return apiRequest<UserProfile>('/api/users/profile', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getUserStats(): Promise<ApiResult<UserStats>> {
+  return apiRequest<UserStats>('/api/users/stats', { method: 'GET' });
 }
 
 export async function identifyBarcode(input: {
