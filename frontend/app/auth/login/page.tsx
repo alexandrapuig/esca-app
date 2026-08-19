@@ -31,47 +31,33 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_#fcf1d7,_#f3e4bc_45%,_#efe8dd_100%)] px-6 py-16 text-stone-900">
-      <section className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-[0_30px_90px_rgba(120,98,52,0.18)] lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="flex flex-col justify-between bg-stone-900 px-8 py-10 text-stone-100 sm:px-12">
+    <main className="flex min-h-screen items-center justify-center bg-white px-6 py-16 text-gray-900">
+      <section className="grid w-full max-w-5xl overflow-hidden rounded-2xl border border-gray-200 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="relative flex flex-col justify-between bg-[linear-gradient(rgba(6,40,26,0.55),rgba(6,40,26,0.75)),url('https://images.unsplash.com/photo-1464207687429-7505649dae38?w=1200&h=1600&fit=crop')] bg-cover bg-center px-8 py-10 text-white sm:px-12">
           <div>
-            <p className="text-sm uppercase tracking-[0.35em] text-amber-300">Esca</p>
-            <h1 className="mt-6 max-w-md text-4xl font-semibold tracking-tight sm:text-5xl">
+            <p className="text-sm font-medium uppercase tracking-wide text-amber-200">Esca</p>
+            <h1 className="mt-6 max-w-md font-serif text-5xl leading-tight">
               Reduce waste with a fridge assistant that actually remembers what you own.
             </h1>
-            <p className="mt-6 max-w-lg text-base leading-7 text-stone-300">
+            <p className="mt-6 max-w-lg text-lg font-light leading-relaxed text-gray-100">
               Sign in to track expiring food, see spoilage risk, and keep your kitchen decisions grounded in live inventory.
             </p>
-          </div>
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm text-stone-400">Inventory</p>
-              <p className="mt-2 text-2xl font-semibold">Barcode-first</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm text-stone-400">Predictions</p>
-              <p className="mt-2 text-2xl font-semibold">Claude-guided</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm text-stone-400">Habits</p>
-              <p className="mt-2 text-2xl font-semibold">Waste-aware</p>
-            </div>
           </div>
         </div>
 
         <div className="flex items-center px-6 py-10 sm:px-10">
           <div className="w-full">
-            <p className="text-sm font-medium uppercase tracking-[0.3em] text-stone-500">Welcome back</p>
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight">Sign in to Esca</h2>
-            <p className="mt-3 text-sm leading-6 text-stone-600">
+            <p className="text-sm font-medium uppercase tracking-wide text-gray-500">Welcome back</p>
+            <h2 className="mt-4 font-serif text-4xl leading-tight">Sign in to Esca</h2>
+            <p className="mt-3 text-base font-light leading-relaxed text-gray-600">
               Use your Supabase email and password. If you just created an account, confirm your email first.
             </p>
 
-            <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+            <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-stone-700">Email</span>
+                <span className="mb-3 block text-sm font-medium text-gray-900">Email</span>
                 <input
-                  className="w-full rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-base outline-none transition focus:border-stone-900 focus:bg-white"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   type="email"
                   name="email"
                   autoComplete="email"
@@ -82,9 +68,9 @@ export default function LoginPage() {
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-stone-700">Password</span>
+                <span className="mb-3 block text-sm font-medium text-gray-900">Password</span>
                 <input
-                  className="w-full rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-base outline-none transition focus:border-stone-900 focus:bg-white"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   type="password"
                   name="password"
                   autoComplete="current-password"
@@ -95,23 +81,23 @@ export default function LoginPage() {
               </label>
 
               {errorMessage ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {errorMessage}
                 </div>
               ) : null}
 
               <button
-                className="w-full rounded-full bg-stone-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-400"
+                className="w-full rounded-lg bg-emerald-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-gray-400"
                 type="submit"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Signing in...' : 'Sign in'}
+                {isSubmitting ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
 
-            <p className="mt-6 text-sm text-stone-600">
+            <p className="mt-6 text-sm font-light text-gray-600">
               Need an account?{' '}
-              <Link className="font-semibold text-stone-900 underline decoration-amber-400 underline-offset-4" href="/auth/signup">
+              <Link className="font-medium text-emerald-900 underline decoration-amber-400 underline-offset-4" href="/auth/signup">
                 Create one here
               </Link>
             </p>

@@ -39,17 +39,17 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,_#f7efe0_0%,_#dce7d9_50%,_#f5f0e8_100%)] px-6 py-16 text-stone-900">
-      <section className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-[0_30px_90px_rgba(84,97,61,0.18)] lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="border-b border-stone-200 bg-[#f2eadc] px-8 py-10 lg:border-b-0 lg:border-r lg:px-10">
-          <p className="text-sm uppercase tracking-[0.35em] text-emerald-700">New account</p>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-stone-900">Create your Esca workspace.</h1>
-          <p className="mt-5 max-w-md text-base leading-7 text-stone-700">
+    <main className="flex min-h-screen items-center justify-center bg-white px-6 py-16 text-gray-900">
+      <section className="grid w-full max-w-5xl overflow-hidden rounded-2xl border border-gray-200 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="relative border-b border-gray-200 bg-[linear-gradient(rgba(6,40,26,0.55),rgba(6,40,26,0.75)),url('https://images.unsplash.com/photo-1488459716781-6818ecf01d4b?w=1200&h=1600&fit=crop')] bg-cover bg-center px-8 py-10 text-white lg:border-b-0 lg:border-r lg:px-10">
+          <p className="text-sm font-medium uppercase tracking-wide text-amber-200">New account</p>
+          <h1 className="mt-5 font-serif text-4xl leading-tight">Create your Esca workspace.</h1>
+          <p className="mt-5 max-w-md text-lg font-light leading-relaxed text-gray-100">
             Start with a verified account, then connect your kitchen inventory to spoilage predictions and recipe suggestions.
           </p>
-          <div className="mt-8 rounded-[1.5rem] bg-white p-5 shadow-sm">
-            <p className="text-sm text-stone-500">What happens next</p>
-            <ul className="mt-3 space-y-3 text-sm leading-6 text-stone-700">
+          <div className="mt-8 rounded-2xl bg-white/95 p-5 text-gray-900">
+            <p className="text-sm text-gray-600">What happens next</p>
+            <ul className="mt-3 space-y-3 text-sm font-light leading-relaxed text-gray-700">
               <li>1. Create an account with email and password.</li>
               <li>2. Confirm the verification email from Supabase.</li>
               <li>3. Land in your dashboard with your user profile ready.</li>
@@ -59,16 +59,16 @@ export default function SignupPage() {
 
         <div className="flex items-center px-6 py-10 sm:px-10">
           <div className="w-full">
-            <h2 className="text-3xl font-semibold tracking-tight">Set up your account</h2>
-            <p className="mt-3 text-sm leading-6 text-stone-600">
+            <h2 className="font-serif text-4xl leading-tight">Set up your account</h2>
+            <p className="mt-3 text-base font-light leading-relaxed text-gray-600">
               Use a strong password. Esca will redirect verified users to the dashboard automatically.
             </p>
 
-            <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+            <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-stone-700">Email</span>
+                <span className="mb-3 block text-sm font-medium text-gray-900">Email</span>
                 <input
-                  className="w-full rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   type="email"
                   autoComplete="email"
                   required
@@ -78,9 +78,9 @@ export default function SignupPage() {
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-stone-700">Password</span>
+                <span className="mb-3 block text-sm font-medium text-gray-900">Password</span>
                 <input
-                  className="w-full rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   type="password"
                   autoComplete="new-password"
                   minLength={8}
@@ -91,29 +91,29 @@ export default function SignupPage() {
               </label>
 
               {errorMessage ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {errorMessage}
                 </div>
               ) : null}
 
               {successMessage ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                   {successMessage}
                 </div>
               ) : null}
 
               <button
-                className="w-full rounded-full bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
+                className="w-full rounded-lg bg-emerald-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-gray-400"
                 type="submit"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Creating account...' : 'Create account'}
+                {isSubmitting ? 'Creating account...' : 'Create Account'}
               </button>
             </form>
 
-            <p className="mt-6 text-sm text-stone-600">
+            <p className="mt-6 text-sm font-light text-gray-600">
               Already registered?{' '}
-              <Link className="font-semibold text-stone-900 underline decoration-emerald-400 underline-offset-4" href="/auth/login">
+              <Link className="font-medium text-emerald-900 underline decoration-emerald-400 underline-offset-4" href="/auth/login">
                 Sign in instead
               </Link>
             </p>

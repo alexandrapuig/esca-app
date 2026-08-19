@@ -175,39 +175,40 @@ export default function AddInventoryItemPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f3f0dc,_#e5f0df_45%,_#f9f7f2_100%)] px-6 py-10 text-stone-900">
+    <main className="min-h-screen bg-white px-6 py-10 text-gray-900 md:px-12 md:py-16">
       <div className="mx-auto w-full max-w-3xl">
-        <section className="rounded-[2rem] border border-stone-200 bg-white p-8 shadow-[0_24px_80px_rgba(55,69,42,0.14)]">
+        <section className="rounded-2xl border border-gray-200 p-6 md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-emerald-700">Add item</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight">Add to your fridge inventory</h1>
+              <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">Add item</p>
+              <h1 className="mt-2 font-serif text-3xl leading-tight">Add to your fridge inventory</h1>
             </div>
             <Link
               href="/inventory"
-              className="inline-flex rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:border-stone-500"
+              className="inline-flex rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 transition hover:border-gray-400"
             >
               Back to inventory
             </Link>
           </div>
 
-          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-stone-700">Item name *</span>
+              <span className="mb-3 block text-sm font-medium text-gray-900">Item Name *</span>
               <input
-                className="w-full rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 type="text"
+                placeholder="e.g., Organic Carrots, Greek Yogurt"
                 required
                 value={name}
                 onChange={(event) => setName(event.target.value)}
               />
             </label>
 
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-6 sm:grid-cols-2">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-stone-700">Category</span>
+                <span className="mb-3 block text-sm font-medium text-gray-900">Category</span>
                 <select
-                  className="w-full rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   value={category}
                   onChange={(event) => setCategory(event.target.value as (typeof CATEGORIES)[number])}
                 >
@@ -220,11 +221,12 @@ export default function AddInventoryItemPage() {
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-stone-700">Quantity</span>
+                <span className="mb-3 block text-sm font-medium text-gray-900">Quantity</span>
                 <input
-                  className="w-full rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   type="text"
                   inputMode="decimal"
+                  placeholder="1"
                   value={quantity}
                   onChange={(event) => setQuantity(event.target.value)}
                 />
@@ -232,9 +234,9 @@ export default function AddInventoryItemPage() {
             </div>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-stone-700">Unit</span>
+              <span className="mb-3 block text-sm font-medium text-gray-900">Unit</span>
               <input
-                className="w-full rounded-2xl border border-stone-300 bg-stone-50 px-4 py-3 text-base outline-none transition focus:border-emerald-700 focus:bg-white"
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 type="text"
                 placeholder="e.g. pcs, kg, ml"
                 value={unit}
@@ -242,17 +244,17 @@ export default function AddInventoryItemPage() {
               />
             </label>
 
-            <div className="rounded-2xl border border-stone-200 bg-[#f6f7f2] p-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-stone-600">Barcode scanner</p>
-              <p className="mt-2 text-sm text-stone-600">Use your camera to scan a barcode, or fill fields manually.</p>
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+              <p className="text-sm font-medium uppercase tracking-wide text-gray-600">Barcode scanner</p>
+              <p className="mt-2 text-sm font-light text-gray-600">Use your camera to scan a barcode, or fill fields manually.</p>
 
               <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-start">
-                <video ref={videoRef} className="aspect-video w-full rounded-xl border border-stone-300 bg-black/80 object-cover" muted />
+                <video ref={videoRef} className="aspect-video w-full rounded-lg border border-gray-300 bg-black/80 object-cover" muted />
                 <div className="flex flex-col gap-2">
                   {!isScanning ? (
                     <button
                       type="button"
-                      className="rounded-full bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700"
+                      className="rounded-lg bg-emerald-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800"
                       onClick={startScanning}
                     >
                       Scan barcode
@@ -260,7 +262,7 @@ export default function AddInventoryItemPage() {
                   ) : (
                     <button
                       type="button"
-                      className="rounded-full border border-stone-400 px-4 py-2 text-sm font-semibold text-stone-700"
+                      className="rounded-lg border border-gray-400 px-4 py-2 text-sm font-medium text-gray-700"
                       onClick={stopScanning}
                     >
                       Stop scan
@@ -271,20 +273,20 @@ export default function AddInventoryItemPage() {
 
               {scanValue ? (
                 <div className="mt-3 space-y-2">
-                  <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
                     Scanned code: {scanValue}
                   </p>
-                  {isIdentifying ? <p className="text-sm text-stone-600">Identifying product with AI...</p> : null}
+                  {isIdentifying ? <p className="text-sm text-gray-600">Identifying product with AI...</p> : null}
                   {identified ? (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
                       <p>
-                        <span className="font-semibold">Identified product:</span> {identified.name}
+                        <span className="font-medium">Identified product:</span> {identified.name}
                       </p>
                       <p>
-                        <span className="font-semibold">Category:</span> {identified.category}
+                        <span className="font-medium">Category:</span> {identified.category}
                       </p>
                       <p>
-                        <span className="font-semibold">Estimated shelf life:</span> {identified.typical_shelf_life_days} days
+                        <span className="font-medium">Estimated shelf life:</span> {identified.typical_shelf_life_days} days
                       </p>
                       <p className="mt-1 text-xs text-amber-800">You can still edit any field before saving.</p>
                     </div>
@@ -294,17 +296,41 @@ export default function AddInventoryItemPage() {
             </div>
 
             {errorMessage ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>
             ) : null}
 
             <button
-              className="w-full rounded-full bg-emerald-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
+              className="w-full rounded-lg bg-emerald-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-gray-400"
               type="submit"
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Adding item...' : 'Add item'}
             </button>
           </form>
+
+          <div className="mt-8 grid gap-4 border-t border-gray-200 pt-8 sm:grid-cols-3">
+            <div>
+              <p className="text-2xl">🧊</p>
+              <p className="mt-2 text-sm font-medium text-gray-900">Keep It Cool</p>
+              <p className="mt-1 text-xs font-light leading-snug text-gray-600">
+                Store dairy and proteins in the coldest part of your fridge
+              </p>
+            </div>
+            <div>
+              <p className="text-2xl">💨</p>
+              <p className="mt-2 text-sm font-medium text-gray-900">Good Ventilation</p>
+              <p className="mt-1 text-xs font-light leading-snug text-gray-600">
+                Vegetables last longer with proper air circulation
+              </p>
+            </div>
+            <div>
+              <p className="text-2xl">🎯</p>
+              <p className="mt-2 text-sm font-medium text-gray-900">First In, First Out</p>
+              <p className="mt-1 text-xs font-light leading-snug text-gray-600">
+                Use older items before newer ones to minimize waste
+              </p>
+            </div>
+          </div>
         </section>
       </div>
     </main>
