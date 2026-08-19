@@ -51,6 +51,7 @@ type ServiceFailure = {
   success: false;
   status: number;
   error: string;
+  debug?: Record<string, unknown>;
 };
 
 type ServiceResult<T> = ServiceSuccess<T> | ServiceFailure;
@@ -135,29 +136,41 @@ export async function createFridgeItem(params: {
     ? new Date(purchaseDate.getTime() + shelfLifeDays * 24 * 60 * 60 * 1000)
     : estimateExpiryDate(normalizedCategory, purchaseDate);
 
+  const row = {
+    user_id: params.userId,
+    name: params.name.trim(),
+    category: normalizedCategory,
+    quantity: params.quantity ?? null,
+    unit: params.unit?.trim() || null,
+    typical_shelf_life_days: shelfLifeDays,
+    purchase_date: purchaseDate.toISOString(),
+    estimated_expiry: estimatedExpiry.toISOString(),
+    status: 'fresh',
+  };
+
   const { data, error } = await supabase
     .from('fridge_items')
-    .insert({
-      user_id: params.userId,
-      name: params.name.trim(),
-      category: normalizedCategory,
-      quantity: params.quantity ?? null,
-      unit: params.unit?.trim() || null,
-      typical_shelf_life_days: shelfLifeDays,
-      purchase_date: purchaseDate.toISOString(),
-      estimated_expiry: estimatedExpiry.toISOString(),
-      status: 'fresh',
-    })
+    .insert(row)
     .select(
       'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at',
     )
     .single<FridgeItemRow>();
 
   if (error || !data) {
+    console.error('createFridgeItem failed', { userId: params.userId, row, error });
     return {
       success: false,
       status: 500,
       error: 'Unable to create fridge item',
+      // TEMPORARY — remove before this is public
+      debug: {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        userId: params.userId,
+        rowKeys: Object.keys(row),
+      },
     };
   }
 
