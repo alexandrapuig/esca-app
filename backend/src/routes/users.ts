@@ -25,7 +25,7 @@ router.get('/profile', requireAuth, async (req: Request, res: Response) => {
     // Now that Step 1 (database migration) has run, this column exists and contains
     // the user's preferred cuisine types as a TEXT[] array
     const { data, error } = await supabase
-      .from('public.users')
+      .from('users')
       .select('id, email, dietary_restrictions, cuisine_preferences, created_at')
       .eq('id', userId)
       .single();
