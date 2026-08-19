@@ -49,13 +49,13 @@ CREATE TABLE IF NOT EXISTS public.users (
   created_at           timestamp without time zone DEFAULT now()
 );
 
--- NOTE: the live database has NO foreign key from users.auth_user_id to
--- auth.users(id). It was lost when public.users was dropped with CASCADE and
--- was not rebuilt. Deleting an auth user therefore leaves an orphaned row here.
--- Left absent to match production. To add it:
---   ALTER TABLE public.users
---     ADD CONSTRAINT users_auth_user_id_fkey
---     FOREIGN KEY (auth_user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+-- Added 2026-08-19. This FK was lost when public.users was dropped with CASCADE
+-- and went unrebuilt, which allowed orphaned profile rows to accumulate when
+-- auth users were deleted. One such row existed and was removed before the
+-- constraint could be applied.
+ALTER TABLE public.users
+  ADD CONSTRAINT users_auth_user_id_fkey
+  FOREIGN KEY (auth_user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 -- NOTE: users.created_at is `timestamp without time zone`, while every other
 -- table uses `timestamp with time zone`. Inconsistent, but matches production.
@@ -162,8 +162,8 @@ CREATE TABLE IF NOT EXISTS public.barcode_cache (
 -- Row Level Security
 -- ---------------------------------------------------------------------------
 --
--- ⚠️  THE POLICIES BELOW ARE REPRODUCED FROM THE LIVE DATABASE AND ARE BROKEN.
---     See "RLS is not currently functional" at the bottom of this file.
+-- WARNING: the policies below are reproduced from the live database and are
+-- BROKEN. See issue 1 at the bottom of this file.
 --
 -- The backend uses a Supabase secret key (sb_secret_...), which carries
 -- BYPASSRLS, so these policies are not exercised by the application today.
@@ -276,14 +276,22 @@ CREATE POLICY "Authenticated users can insert barcode cache"
 --    treated as enums by the application but are unconstrained `text` in the
 --    database. Validation is application-side only.
 --
--- 4. MISSING FOREIGN KEY: users.auth_user_id -> auth.users(id)
---
---    Lost in a DROP TABLE ... CASCADE and never rebuilt. See the note above
---    the users table.
---
--- 5. NO DELETE POLICY ON spoilage_predictions
+-- 4. NO DELETE POLICY ON spoilage_predictions
 --
 --    The other tables have four policies each; this one has three.
+--
+-- ===========================================================================
+-- RESOLVED
+-- ===========================================================================
+--
+-- 2026-08-19  fridge_items.shelf_life_days renamed to typical_shelf_life_days
+--             to match the application code. This was the cause of PGRST204 on
+--             every insert, and of 500s on the list and status-update endpoints,
+--             which named the same column in their SELECT lists.
+--
+-- 2026-08-19  users_auth_user_id_fkey added (see the users table above). One
+--             orphaned profile row was deleted first; it had no dependent
+--             fridge items, predictions, or recipes.
 --
 -- ===========================================================================
 -- KEEPING THIS FILE HONEST
