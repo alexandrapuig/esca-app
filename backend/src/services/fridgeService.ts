@@ -162,15 +162,6 @@ export async function createFridgeItem(params: {
       success: false,
       status: 500,
       error: 'Unable to create fridge item',
-      // TEMPORARY — remove before this is public
-      debug: {
-        message: error?.message,
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint,
-        userId: params.userId,
-        rowKeys: Object.keys(row),
-      },
     };
   }
 
