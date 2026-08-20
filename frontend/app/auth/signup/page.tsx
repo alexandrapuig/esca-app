@@ -10,6 +10,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [hasAcceptedLegalTerms, setHasAcceptedLegalTerms] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,10 +103,30 @@ export default function SignupPage() {
                 </div>
               ) : null}
 
+              <label className="flex items-start gap-3 text-sm font-light leading-relaxed text-gray-600">
+                <input
+                  className="mt-1 size-4 accent-emerald-900"
+                  checked={hasAcceptedLegalTerms}
+                  onChange={(event) => setHasAcceptedLegalTerms(event.target.checked)}
+                  required
+                  type="checkbox"
+                />
+                <span>
+                  I agree to the{' '}
+                  <Link className="font-medium text-emerald-900 underline decoration-emerald-400 underline-offset-4" href="/legal/terms" rel="noopener noreferrer" target="_blank">
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link className="font-medium text-emerald-900 underline decoration-emerald-400 underline-offset-4" href="/legal/privacy" rel="noopener noreferrer" target="_blank">
+                    Privacy Policy
+                  </Link>.
+                </span>
+              </label>
+
               <button
                 className="w-full rounded-lg bg-emerald-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-gray-400"
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !hasAcceptedLegalTerms}
               >
                 {isSubmitting ? 'Creating account...' : 'Create Account'}
               </button>
