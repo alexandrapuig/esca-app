@@ -38,6 +38,9 @@ export type UserProfile = {
   name: string | null;
   dietary_restrictions: string[];
   created_at: string;
+  terms_accepted_at: string | null;
+  terms_version: string | null;
+  termsAccepted: boolean;
 };
 
 export type UserStats = {
@@ -194,6 +197,13 @@ export async function updateUserProfile(input: {
   return apiRequest<UserProfile>('/api/users/profile', {
     method: 'PUT',
     body: JSON.stringify(input),
+  });
+}
+
+export async function acceptTerms(): Promise<ApiResult<UserProfile>> {
+  return apiRequest<UserProfile>('/api/users/accept-terms', {
+    method: 'POST',
+    body: JSON.stringify({}),
   });
 }
 

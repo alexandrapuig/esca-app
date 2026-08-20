@@ -1,6 +1,7 @@
 import { Router, type Request } from 'express';
 
-import { getUserProfile, getUserStats, updateUserProfile } from '../services/userService';
+import { CURRENT_TERMS_VERSION } from '../config/terms';
+import { acceptTerms, getUserProfile, getUserStats, updateUserProfile } from '../services/userService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
 
 type UpdateProfileBody = {
@@ -19,6 +20,27 @@ function getAuthenticatedRequest(req: Request): AuthenticatedRequest {
 router.get('/profile', async (req, res) => {
   const request = getAuthenticatedRequest(req);
   const result = await getUserProfile(request.user.id);
+
+  if (!result.success) {
+    res.status(result.status).json({
+      success: false,
+      error: result.error,
+    });
+    return;
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      ...result.data,
+      termsAccepted: result.data.terms_version === CURRENT_TERMS_VERSION,
+    },
+  });
+});
+
+router.post('/accept-terms', async (req, res) => {
+  const request = getAuthenticatedRequest(req);
+  const result = await acceptTerms(request.user.id, CURRENT_TERMS_VERSION);
 
   if (!result.success) {
     res.status(result.status).json({

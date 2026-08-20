@@ -20,6 +20,8 @@ export type UserProfile = {
   name: string | null;
   dietary_restrictions: string[];
   created_at: string;
+  terms_accepted_at: string | null;
+  terms_version: string | null;
 };
 
 export type UserStats = {
@@ -48,6 +50,8 @@ type UserRow = {
   name: string | null;
   dietary_restrictions: string[] | null;
   created_at: string;
+  terms_accepted_at: string | null;
+  terms_version: string | null;
 };
 
 function mapUserProfile(row: UserRow): UserProfile {
@@ -57,6 +61,8 @@ function mapUserProfile(row: UserRow): UserProfile {
     name: row.name,
     dietary_restrictions: row.dietary_restrictions ?? [],
     created_at: row.created_at,
+    terms_accepted_at: row.terms_accepted_at,
+    terms_version: row.terms_version,
   };
 }
 
@@ -85,7 +91,7 @@ export async function getUserProfile(userId: string): Promise<ServiceResult<User
 
   const { data, error } = await supabase
     .from('users')
-    .select('id, email, name, dietary_restrictions, created_at')
+    .select('id, email, name, dietary_restrictions, created_at, terms_accepted_at, terms_version')
     .eq('id', userId)
     .single<UserRow>();
 
@@ -125,12 +131,37 @@ export async function updateUserProfile(
     .from('users')
     .update(patch)
     .eq('id', userId)
-    .select('id, email, name, dietary_restrictions, created_at')
+    .select('id, email, name, dietary_restrictions, created_at, terms_accepted_at, terms_version')
     .single<UserRow>();
 
   if (error || !data) {
     console.error('updateUserProfile failed', { userId, error });
     return { success: false, status: 500, error: 'Unable to update profile' };
+  }
+
+  return { success: true, data: mapUserProfile(data) };
+}
+
+export async function acceptTerms(userId: string, version: string): Promise<ServiceResult<UserProfile>> {
+  let supabase: SupabaseClient;
+
+  try {
+    supabase = getSupabaseAdminClient();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Supabase is not configured';
+    return { success: false, status: 500, error: message };
+  }
+
+  const { data, error } = await supabase
+    .from('users')
+    .update({ terms_accepted_at: new Date().toISOString(), terms_version: version })
+    .eq('id', userId)
+    .select('id, email, name, dietary_restrictions, created_at, terms_accepted_at, terms_version')
+    .single<UserRow>();
+
+  if (error || !data) {
+    console.error('acceptTerms failed', { userId, error });
+    return { success: false, status: 500, error: 'Unable to record terms acceptance' };
   }
 
   return { success: true, data: mapUserProfile(data) };
