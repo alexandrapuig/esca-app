@@ -253,3 +253,7 @@ export async function updateRecipe(recipeId: string, input: { saved?: boolean; c
     body: JSON.stringify(input),
   });
 }
+
+export async function deleteAccount(): Promise<ApiResult<{ deleted: true }>> {
+  return apiRequest<{ deleted: true }>('/api/users/account', { method: 'DELETE' });
+}

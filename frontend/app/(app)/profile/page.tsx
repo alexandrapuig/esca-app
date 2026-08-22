@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-import { getUserProfile, getUserStats, updateUserProfile } from '@/lib/api';
+import { deleteAccount, getUserProfile, getUserStats, updateUserProfile } from '@/lib/api';
+import { signOut } from '@/lib/supabase';
 import type { UserStats } from '@/lib/api';
 
 const DIETARY_OPTIONS = [
@@ -26,6 +27,24 @@ export default function ProfilePage() {
   const [name, setName] = useState('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  async function handleDeleteAccount() {
+    setIsDeleting(true);
+    setErrorMessage('');
+
+    const result = await deleteAccount();
+
+    if (!result.success) {
+      setErrorMessage(result.error);
+      setIsDeleting(false);
+      return;
+    }
+
+    await signOut();
+    window.location.href = '/';
+  }
 
   useEffect(() => {
     async function loadProfile() {
@@ -171,6 +190,33 @@ export default function ProfilePage() {
             </div>
           </section>
         ) : null}
+
+        <section className="rounded-2xl border border-red-200 p-6 md:p-8">
+          <p className="text-sm font-medium uppercase tracking-wide text-red-700">Danger zone</p>
+          <h2 className="mt-4 font-serif text-2xl">Delete account</h2>
+          <p className="mt-3 text-sm font-light text-gray-600">
+            This permanently deletes your account, your inventory, and all associated data.
+            It cannot be undone.
+          </p>
+          <label className="mt-6 mb-3 block text-sm font-medium text-gray-900">
+            Type <span className="font-mono">{email}</span> to confirm
+          </label>
+          <input
+            type="text"
+            value={deleteConfirmText}
+            onChange={(event) => setDeleteConfirmText(event.target.value)}
+            placeholder={email}
+            className="w-full max-w-md rounded-lg border border-gray-300 px-4 py-3 text-gray-900 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-red-600"
+          />
+          <button
+            type="button"
+            onClick={handleDeleteAccount}
+            disabled={deleteConfirmText !== email || isDeleting}
+            className="mt-4 inline-flex items-center justify-center rounded-lg bg-red-700 px-6 py-3 text-sm font-medium text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isDeleting ? 'Deleting...' : 'Delete my account'}
+          </button>
+        </section>
 
         <button
           type="button"
