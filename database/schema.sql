@@ -44,10 +44,12 @@ CREATE TABLE IF NOT EXISTS public.users (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   auth_user_id         uuid NOT NULL UNIQUE,
   email                text NOT NULL UNIQUE,
-  name                 text,
   dietary_restrictions text[] DEFAULT ARRAY[]::text[],
   cuisine_preferences  text[] DEFAULT ARRAY[]::text[],
-  created_at           timestamp without time zone DEFAULT now()
+  created_at           timestamp without time zone DEFAULT now(),
+  name                 text,
+  terms_accepted_at    timestamptz,
+  terms_version        text
 );
 
 -- Added 2026-08-19. This FK was lost when public.users was dropped with CASCADE
@@ -60,6 +62,16 @@ ALTER TABLE public.users
 
 -- NOTE: users.created_at is `timestamp without time zone`, while every other
 -- table uses `timestamp with time zone`. Inconsistent, but matches production.
+-- terms_accepted_at, in the same table, IS timestamptz.
+--
+-- Added 2026-08-22. terms_accepted_at and terms_version were live in the
+-- database but missing from this file; userService.getUserProfile selects both
+-- on every profile request. Column order above now matches live
+-- ordinal_position, verified via information_schema.columns on 2026-08-22.
+--
+-- Nullability and defaults for these two columns were NOT verified: the query
+-- run selected only column_name and data_type. They are written as nullable
+-- with no default, which is an assumption, not a confirmed fact.
 
 -- ---------------------------------------------------------------------------
 -- fridge_items
