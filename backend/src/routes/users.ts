@@ -1,6 +1,7 @@
 import { Router, type Request } from 'express';
 
 import { CURRENT_TERMS_VERSION } from '../config/terms';
+import { deleteAccount } from '../services/accountService';
 import { acceptTerms, getUserProfile, getUserStats, updateUserProfile } from '../services/userService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
 
@@ -79,6 +80,24 @@ router.put('/profile', async (req, res) => {
 router.get('/stats', async (req, res) => {
   const request = getAuthenticatedRequest(req);
   const result = await getUserStats(request.user.id);
+
+  if (!result.success) {
+    res.status(result.status).json({
+      success: false,
+      error: result.error,
+    });
+    return;
+  }
+
+  res.status(200).json({
+    success: true,
+    data: result.data,
+  });
+});
+
+router.delete('/account', async (req, res) => {
+  const request = getAuthenticatedRequest(req);
+  const result = await deleteAccount(request.user.id);
 
   if (!result.success) {
     res.status(result.status).json({
