@@ -14,6 +14,11 @@ type CreateFridgeItemBody = {
   quantity?: number;
   unit?: string;
   typical_shelf_life_days?: number;
+  brand?: string;
+  purchase_location?: string;
+  purchase_price?: number;
+  notes?: string;
+  purchase_date?: string;
 };
 
 type UpdateFridgeItemBody = {
@@ -47,6 +52,11 @@ router.post('/items', async (req, res) => {
     quantity?: number;
     unit?: string;
     typicalShelfLifeDays?: number;
+    brand?: string;
+    purchaseLocation?: string;
+    purchasePrice?: number;
+    notes?: string;
+    purchaseDate?: string;
   } = {
     userId: request.user.id,
     name: body.name,
@@ -66,6 +76,26 @@ router.post('/items', async (req, res) => {
 
   if (typeof body.typical_shelf_life_days === 'number') {
     createInput.typicalShelfLifeDays = body.typical_shelf_life_days;
+  }
+
+  if (typeof body.brand === 'string') {
+    createInput.brand = body.brand;
+  }
+
+  if (typeof body.purchase_location === 'string') {
+    createInput.purchaseLocation = body.purchase_location;
+  }
+
+  if (typeof body.purchase_price === 'number') {
+    createInput.purchasePrice = body.purchase_price;
+  }
+
+  if (typeof body.notes === 'string') {
+    createInput.notes = body.notes;
+  }
+
+  if (typeof body.purchase_date === 'string') {
+    createInput.purchaseDate = body.purchase_date;
   }
 
   const result = await createFridgeItem(createInput);

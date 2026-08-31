@@ -54,6 +54,12 @@ export default function AddInventoryItemPage() {
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('other');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('');
+  const [brand, setBrand] = useState('');
+  const [purchaseLocation, setPurchaseLocation] = useState('');
+  const [purchasePrice, setPurchasePrice] = useState('');
+  const [notes, setNotes] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -146,6 +152,19 @@ export default function AddInventoryItemPage() {
       return;
     }
 
+    let parsedPrice: number | undefined;
+
+    if (purchasePrice.trim()) {
+      const value = Number(purchasePrice);
+
+      if (Number.isNaN(value) || value < 0) {
+        setErrorMessage('Purchase price must be a positive number');
+        return;
+      }
+
+      parsedPrice = value;
+    }
+
     setIsSubmitting(true);
 
     const parsedQuantity = quantity.trim() ? Number(quantity) : undefined;
@@ -162,6 +181,11 @@ export default function AddInventoryItemPage() {
       quantity: parsedQuantity,
       unit: unit.trim() || undefined,
       typical_shelf_life_days: identified?.typical_shelf_life_days,
+      brand: brand.trim() || undefined,
+      purchase_location: purchaseLocation.trim() || undefined,
+      purchase_price: parsedPrice,
+      notes: notes.trim() || undefined,
+      purchase_date: purchaseDate || undefined,
     });
 
     if (!result.success) {
@@ -243,6 +267,47 @@ export default function AddInventoryItemPage() {
                 onChange={(event) => setUnit(event.target.value)}
               />
             </label>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowMoreDetails((prev) => !prev)}
+                className="text-sm font-medium text-emerald-700 transition hover:text-emerald-800"
+              >
+                {showMoreDetails ? 'Hide extra details' : 'Add more details'}
+              </button>
+
+              {showMoreDetails ? (
+                <div className="mt-6 space-y-6">
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-3 block text-sm font-medium text-gray-900">Brand</span>
+                      <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="text" placeholder="e.g. Chobani" value={brand} onChange={(event) => setBrand(event.target.value)} />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-3 block text-sm font-medium text-gray-900">Purchase date</span>
+                      <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-3 block text-sm font-medium text-gray-900">Purchased from</span>
+                      <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="text" placeholder="e.g. Trader Joe's" value={purchaseLocation} onChange={(event) => setPurchaseLocation(event.target.value)} />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-3 block text-sm font-medium text-gray-900">Price paid</span>
+                      <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="text" inputMode="decimal" placeholder="4.99" value={purchasePrice} onChange={(event) => setPurchasePrice(event.target.value)} />
+                    </label>
+                  </div>
+
+                  <label className="block">
+                    <span className="mb-3 block text-sm font-medium text-gray-900">Notes</span>
+                    <textarea className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" rows={3} placeholder="Anything worth remembering about this item" value={notes} onChange={(event) => setNotes(event.target.value)} />
+                  </label>
+                </div>
+              ) : null}
+            </div>
 
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
               <p className="text-sm font-medium uppercase tracking-wide text-gray-600">Barcode scanner</p>

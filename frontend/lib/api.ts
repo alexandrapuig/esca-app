@@ -24,6 +24,10 @@ export type FridgeItem = {
   estimatedExpiry: string | null;
   status: 'fresh' | 'consumed' | 'expired';
   createdAt: string;
+  brand: string | null;
+  purchaseLocation: string | null;
+  purchasePrice: number | null;
+  notes: string | null;
 };
 
 export type BarcodeIdentification = {
@@ -137,6 +141,11 @@ export async function addFridgeItem(input: {
   quantity?: number;
   unit?: string;
   typical_shelf_life_days?: number;
+  brand?: string;
+  purchase_location?: string;
+  purchase_price?: number;
+  notes?: string;
+  purchase_date?: string;
 }): Promise<ApiResult<FridgeItem>> {
   return apiRequest<FridgeItem>('/api/fridge/items', {
     method: 'POST',

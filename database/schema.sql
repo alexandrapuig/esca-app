@@ -91,7 +91,11 @@ CREATE TABLE IF NOT EXISTS public.fridge_items (
   storage_location        text DEFAULT 'fridge',
   status                  text DEFAULT 'fresh',
   created_at              timestamptz DEFAULT now(),
-  updated_at              timestamptz DEFAULT now()
+  updated_at              timestamptz DEFAULT now(),
+  brand                   text,
+  purchase_location       text,
+  purchase_price          numeric,
+  notes                   text
 );
 
 CREATE INDEX IF NOT EXISTS idx_fridge_items_user_id

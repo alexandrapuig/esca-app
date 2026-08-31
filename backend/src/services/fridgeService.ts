@@ -2,6 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
+const FRIDGE_ITEM_COLUMNS =
+  'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at, brand, purchase_location, purchase_price, notes';
+
 type FridgeStatus = 'fresh' | 'consumed' | 'expired';
 type FridgeCategory =
   | 'produce'
@@ -26,6 +29,10 @@ type FridgeItemRow = {
   estimated_expiry: string | null;
   status: string;
   created_at: string;
+  brand: string | null;
+  purchase_location: string | null;
+  purchase_price: number | null;
+  notes: string | null;
 };
 
 export type FridgeItem = {
@@ -40,6 +47,10 @@ export type FridgeItem = {
   estimatedExpiry: string | null;
   status: FridgeStatus;
   createdAt: string;
+  brand: string | null;
+  purchaseLocation: string | null;
+  purchasePrice: number | null;
+  notes: string | null;
 };
 
 type ServiceSuccess<T> = {
@@ -69,6 +80,10 @@ function mapFridgeItem(row: FridgeItemRow): FridgeItem {
     estimatedExpiry: row.estimated_expiry,
     status: (row.status as FridgeStatus) ?? 'fresh',
     createdAt: row.created_at,
+    brand: row.brand,
+    purchaseLocation: row.purchase_location,
+    purchasePrice: row.purchase_price,
+    notes: row.notes,
   };
 }
 
@@ -116,6 +131,11 @@ export async function createFridgeItem(params: {
   quantity?: number;
   unit?: string;
   typicalShelfLifeDays?: number;
+  brand?: string;
+  purchaseLocation?: string;
+  purchasePrice?: number;
+  notes?: string;
+  purchaseDate?: string;
 }): Promise<ServiceResult<FridgeItem>> {
   let supabase: SupabaseClient;
 
@@ -126,7 +146,14 @@ export async function createFridgeItem(params: {
     return { success: false, status: 500, error: message };
   }
 
-  const purchaseDate = new Date();
+  const parsedPurchaseDate =
+    params.purchaseDate && /^\d{4}-\d{2}-\d{2}$/.test(params.purchaseDate)
+      ? new Date(params.purchaseDate + 'T00:00:00Z')
+      : null;
+  const purchaseDate =
+    parsedPurchaseDate && !Number.isNaN(parsedPurchaseDate.getTime())
+      ? parsedPurchaseDate
+      : new Date();
   const normalizedCategory = normalizeCategory(params.category);
   const shelfLifeDays =
     typeof params.typicalShelfLifeDays === 'number' && Number.isFinite(params.typicalShelfLifeDays)
@@ -136,6 +163,13 @@ export async function createFridgeItem(params: {
     ? new Date(purchaseDate.getTime() + shelfLifeDays * 24 * 60 * 60 * 1000)
     : estimateExpiryDate(normalizedCategory, purchaseDate);
 
+  const normalizedPrice =
+    typeof params.purchasePrice === 'number' &&
+    Number.isFinite(params.purchasePrice) &&
+    params.purchasePrice >= 0
+      ? Math.round(params.purchasePrice * 100) / 100
+      : null;
+
   const row = {
     user_id: params.userId,
     name: params.name.trim(),
@@ -143,16 +177,20 @@ export async function createFridgeItem(params: {
     quantity: params.quantity ?? null,
     unit: params.unit?.trim() || null,
     typical_shelf_life_days: shelfLifeDays,
-    purchase_date: purchaseDate.toISOString(),
-    estimated_expiry: estimatedExpiry.toISOString(),
+    purchase_date: purchaseDate.toISOString().slice(0, 10),
+    estimated_expiry: estimatedExpiry.toISOString().slice(0, 10),
     status: 'fresh',
+    brand: params.brand?.trim() || null,
+    purchase_location: params.purchaseLocation?.trim() || null,
+    purchase_price: normalizedPrice,
+    notes: params.notes?.trim() || null,
   };
 
   const { data, error } = await supabase
     .from('fridge_items')
     .insert(row)
     .select(
-      'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at',
+      FRIDGE_ITEM_COLUMNS,
     )
     .single<FridgeItemRow>();
 
@@ -187,7 +225,7 @@ export async function listFridgeItems(params: {
   let query = supabase
     .from('fridge_items')
     .select(
-      'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at',
+      FRIDGE_ITEM_COLUMNS,
     )
     .eq('user_id', params.userId)
     .order('purchase_date', { ascending: false });
@@ -232,7 +270,7 @@ export async function updateFridgeItemStatus(params: {
     .eq('id', params.itemId)
     .eq('user_id', params.userId)
     .select(
-      'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at',
+      FRIDGE_ITEM_COLUMNS,
     )
     .single<FridgeItemRow>();
 
