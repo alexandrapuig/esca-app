@@ -130,7 +130,7 @@ export default function RecipesPage() {
                 />
                 <div className="flex flex-col p-6 md:p-8">
                   <div className="flex items-start justify-between gap-3">
-                    <h2 className="font-serif text-2xl leading-snug text-gray-900">{recipe.recipe_name}</h2>
+                    <h2 className="font-serif text-2xl leading-snug text-gray-900">{recipe.name}</h2>
                     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${difficultyStyles(recipe.difficulty)}`}>
                       {recipe.difficulty}
                     </span>
@@ -138,6 +138,19 @@ export default function RecipesPage() {
 
                   <p className="mt-3 text-sm font-light leading-relaxed text-gray-700">{recipe.description}</p>
                   <p className="mt-3 text-xs font-medium uppercase tracking-wide text-gray-500">⏱ {recipe.prep_time_minutes} min</p>
+
+                  {recipe.dietary_tags.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {recipe.dietary_tags.map((tag) => (
+                        <span
+                          key={`${recipe.id}-${tag}`}
+                          className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
 
                   <div className="mt-4">
                     <p className="text-sm font-medium text-gray-900">Ingredients</p>

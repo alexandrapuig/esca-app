@@ -28,8 +28,10 @@ function fallbackRecipes(atRiskItems: AtRiskItem[]): RecipeSuggestionResult[] {
 
   return [
     {
-      recipe_name: 'Quick Zero-Waste Stir Fry',
+      name: 'Quick Zero-Waste Stir Fry',
       description: 'A fast stir fry using your highest-risk ingredients first.',
+      cuisine: 'other',
+      dietary_tags: [],
       ingredients: ingredientNames,
       instructions: ['Prep ingredients', 'Saute aromatics', 'Cook ingredients by firmness', 'Season and serve'],
       difficulty: 'easy',
@@ -46,8 +48,8 @@ export async function generateRecipesForUser(params: {
     const supabase = getSupabaseAdminClient();
 
     const { data: atRiskRows, error: atRiskError } = await supabase
-      .from('spoilage_predictions')
-      .select('item_id, risk_level, fridge_items!inner(id, name, category)')
+      .from('latest_spoilage_predictions')
+      .select('fridge_item_id, risk_level, fridge_items!inner(id, name, category)')
       .eq('user_id', params.userId)
       .in('risk_level', ['medium', 'high']);
 
@@ -112,8 +114,10 @@ export async function generateRecipesForUser(params: {
     if (recipes.length > 0) {
       const rows = recipes.map((recipe) => ({
         user_id: params.userId,
-        recipe_name: recipe.recipe_name,
+        name: recipe.name,
         description: recipe.description,
+        cuisine: recipe.cuisine,
+        dietary_tags: recipe.dietary_tags,
         ingredients: recipe.ingredients,
         instructions: recipe.instructions,
         difficulty: recipe.difficulty,
@@ -149,7 +153,7 @@ export async function listRecipesForUser(params: { userId: string }): Promise<{
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from('recipe_suggestions')
-      .select('id, recipe_name, description, ingredients, instructions, difficulty, prep_time_minutes, reasoning, saved, cooked, created_at')
+      .select('id, name, description, cuisine, dietary_tags, ingredients, instructions, difficulty, prep_time_minutes, reasoning, saved, cooked, created_at')
       .eq('user_id', params.userId)
       .order('created_at', { ascending: false })
       .returns<StoredRecipeSuggestion[]>();
@@ -202,7 +206,7 @@ export async function updateRecipeSuggestionFlags(params: {
       .update(updatePayload)
       .eq('id', params.recipeId)
       .eq('user_id', params.userId)
-      .select('id, recipe_name, description, ingredients, instructions, difficulty, prep_time_minutes, reasoning, saved, cooked, created_at')
+      .select('id, name, description, cuisine, dietary_tags, ingredients, instructions, difficulty, prep_time_minutes, reasoning, saved, cooked, created_at')
       .single<StoredRecipeSuggestion>();
 
     if (error || !data) {

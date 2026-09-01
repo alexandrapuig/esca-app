@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+import { DIETARY_OPTIONS, normalizeDietaryTags } from '../config/dietary';
+
 type ClaudeTextContent = {
   type: 'text';
   text: string;
@@ -172,8 +174,10 @@ export async function generateSpoilagePredictionsWithClaude(inventory: {
 }
 
 export type RecipeSuggestionResult = {
-  recipe_name: string;
+  name: string;
   description: string;
+  cuisine: string;
+  dietary_tags: string[];
   ingredients: string[];
   instructions: string[];
   difficulty: 'easy' | 'medium' | 'hard';
@@ -190,7 +194,7 @@ export async function generateRecipesWithClaude(params: {
   dietaryRestrictions: string[];
 }): Promise<RecipeSuggestionResult[]> {
   const output = await callClaude(
-    'You are a creative chef helping reduce food waste. Suggest 2-3 recipes using the provided ingredients (prioritize items expiring soon). Return JSON array with recipe_name, description, ingredients (list), instructions (list), difficulty (easy|medium|hard), prep_time_minutes, and reasoning.',
+    `You are a creative chef helping reduce food waste. Suggest 2-3 recipes using the provided ingredients (prioritize items expiring soon). Return JSON array with name, description, cuisine, dietary_tags (list), ingredients (list), instructions (list), difficulty (easy|medium|hard), prep_time_minutes, and reasoning. dietary_tags MUST only contain values from this exact list, and only where the recipe genuinely qualifies: ${DIETARY_OPTIONS.join(', ')}. Return an empty array if none apply. Do not invent other tags.`,
     [
       {
         role: 'user',
@@ -212,8 +216,10 @@ export async function generateRecipesWithClaude(params: {
   }
 
   return parsed.map((recipe) => ({
-    recipe_name: recipe.recipe_name,
+    name: recipe.name,
     description: recipe.description,
+    cuisine: typeof recipe.cuisine === 'string' ? recipe.cuisine.trim().toLowerCase() : 'other',
+    dietary_tags: normalizeDietaryTags(recipe.dietary_tags),
     ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
     instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
     difficulty: recipe.difficulty,

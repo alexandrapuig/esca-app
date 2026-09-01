@@ -65,8 +65,10 @@ export type SpoilagePrediction = {
 
 export type RecipeSuggestion = {
   id: string;
-  recipe_name: string;
+  name: string;
   description: string;
+  cuisine: string;
+  dietary_tags: string[];
   ingredients: string[];
   instructions: string[];
   difficulty: 'easy' | 'medium' | 'hard';

@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS public.recipe_suggestions (
   user_id           uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   name              text NOT NULL,
   ingredients       text[] DEFAULT '{}'::text[],
-  instructions      text,
+  instructions      text[] DEFAULT '{}'::text[],
   difficulty        text DEFAULT 'medium',
   prep_time_minutes integer,
   cuisine           text DEFAULT 'other',
@@ -152,6 +152,8 @@ CREATE TABLE IF NOT EXISTS public.recipe_suggestions (
   saved             boolean DEFAULT false,
   cooked            boolean DEFAULT false,
   variants          jsonb DEFAULT '[]'::jsonb,
+  description       text,
+  reasoning         text,
   created_at        timestamptz DEFAULT now(),
   updated_at        timestamptz DEFAULT now()
 );
