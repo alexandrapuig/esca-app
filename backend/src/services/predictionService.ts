@@ -10,6 +10,10 @@ export type SpoilagePrediction = {
   reasoning: string;
 };
 
+type SpoilagePredictionRow = Omit<SpoilagePrediction, 'item_id'> & {
+  fridge_item_id: string;
+};
+
 type FridgeItemForPrediction = {
   id: string;
   user_id: string;
@@ -100,18 +104,17 @@ export async function generatePredictionsForUser(params: {
 
     const upsertRows = normalized.map((prediction) => ({
       user_id: params.userId,
-      item_id: prediction.item_id,
+      fridge_item_id: prediction.item_id,
       risk_level: prediction.risk_level,
       days_until_expiry: prediction.days_until_expiry,
       spoilage_probability_percent: prediction.spoilage_probability_percent,
       confidence_score: prediction.confidence_score,
       reasoning: prediction.reasoning,
-      predicted_at: new Date().toISOString(),
     }));
 
-    const { error: upsertError } = await supabase.from('spoilage_predictions').upsert(upsertRows, {
-      onConflict: 'item_id',
-    });
+    const { error: upsertError } = await supabase
+      .from('spoilage_predictions')
+      .insert(upsertRows);
 
     if (upsertError) {
       return {
@@ -145,11 +148,10 @@ export async function getLatestPredictionsForUser(params: { userId: string }): P
   try {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
-      .from('spoilage_predictions')
-      .select('item_id, risk_level, days_until_expiry, spoilage_probability_percent, confidence_score, reasoning')
+      .from('latest_spoilage_predictions')
+      .select('fridge_item_id, risk_level, days_until_expiry, spoilage_probability_percent, confidence_score, reasoning')
       .eq('user_id', params.userId)
-      .order('predicted_at', { ascending: false })
-      .returns<SpoilagePrediction[]>();
+      .returns<SpoilagePredictionRow[]>();
 
     if (error) {
       return {
@@ -161,7 +163,10 @@ export async function getLatestPredictionsForUser(params: { userId: string }): P
 
     return {
       success: true,
-      data: data ?? [],
+      data: (data ?? []).map(({ fridge_item_id, ...prediction }) => ({
+        item_id: fridge_item_id,
+        ...prediction,
+      })),
     };
   } catch (error) {
     return {
