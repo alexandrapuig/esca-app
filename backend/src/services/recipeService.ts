@@ -107,8 +107,14 @@ export async function generateRecipesForUser(params: {
         })),
         dietaryRestrictions: userRow?.dietary_restrictions ?? [],
       });
-    } catch {
-      recipes = fallbackRecipes(atRiskItems);
+    } catch (error) {
+      console.error('generateRecipesWithClaude failed', error);
+      // TEMP_DEBUG: surface the cause in the response; remove once diagnosed.
+      return {
+        success: false,
+        status: 500,
+        error: 'TEMP_DEBUG ' + (error instanceof Error ? error.message : String(error)),
+      };
     }
 
     if (recipes.length > 0) {
