@@ -31,14 +31,18 @@ function getAnthropicApiKey(): string {
   return apiKey;
 }
 
-async function callClaude(systemPrompt: string, messages: ClaudeMessage[]): Promise<string> {
+async function callClaude(
+  systemPrompt: string,
+  messages: ClaudeMessage[],
+  maxTokens = 1200,
+): Promise<string> {
   const apiKey = getAnthropicApiKey();
 
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
     {
       model: 'claude-sonnet-4-5',
-      max_tokens: 1200,
+      max_tokens: maxTokens,
       system: systemPrompt,
       messages,
     },
@@ -63,10 +67,18 @@ async function callClaude(systemPrompt: string, messages: ClaudeMessage[]): Prom
 }
 
 function extractJsonFromText(rawText: string): string {
-  const fencedMatch = rawText.match(/```json\s*([\s\S]*?)```/i);
+  // Closed fence.
+  const fencedMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/i);
 
   if (fencedMatch?.[1]) {
     return fencedMatch[1].trim();
+  }
+
+  // Unclosed fence: the response was truncated before the closing backticks.
+  const openFence = rawText.match(/```(?:json)?\s*([\s\S]*)$/i);
+
+  if (openFence?.[1]) {
+    return openFence[1].trim();
   }
 
   return rawText.trim();
@@ -208,6 +220,7 @@ export async function generateRecipesWithClaude(params: {
         ],
       },
     ],
+    4000,
   );
 
   const jsonText = extractJsonFromText(output);

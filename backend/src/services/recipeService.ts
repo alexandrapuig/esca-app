@@ -109,12 +109,7 @@ export async function generateRecipesForUser(params: {
       });
     } catch (error) {
       console.error('generateRecipesWithClaude failed', error);
-      // TEMP_DEBUG: surface the cause in the response; remove once diagnosed.
-      return {
-        success: false,
-        status: 500,
-        error: 'TEMP_DEBUG ' + (error instanceof Error ? error.message : String(error)),
-      };
+      recipes = fallbackRecipes(atRiskItems);
     }
 
     if (recipes.length > 0) {
