@@ -132,6 +132,12 @@ export async function generatePredictionsForUser(params: {
       .insert(upsertRows);
 
     if (upsertError) {
+      console.error('prediction insert failed', {
+        userId: params.userId,
+        rowCount: upsertRows.length,
+        itemIds: upsertRows.map((row) => row.fridge_item_id),
+        error: upsertError,
+      });
       return {
         success: false,
         status: 500,
