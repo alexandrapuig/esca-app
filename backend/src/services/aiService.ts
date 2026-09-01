@@ -141,8 +141,10 @@ export async function generateSpoilagePredictionsWithClaude(inventory: {
   quantity: number | null;
   unit: string | null;
 }[]): Promise<SpoilagePredictionResult[]> {
+  const today = new Date().toISOString().slice(0, 10);
+
   const output = await callClaude(
-    'You are a food spoilage expert. Analyze this fridge inventory and predict spoilage risk for each item. Return JSON only as an array of objects with keys: item_id, risk_level (low|medium|high), days_until_expiry, spoilage_probability_percent (0-100), confidence_score (0-1), reasoning.',
+    `Today's date is ${today}. You are a food spoilage expert. Analyze this fridge inventory and predict spoilage risk for each item. Every estimated_expiry you are given is correct - never treat a date as a data error, and never override it with your own shelf-life assumption. Judge risk by how close estimated_expiry is to today. Return JSON only as an array of objects with keys: item_id, risk_level (low|medium|high), days_until_expiry, spoilage_probability_percent (0-100), confidence_score (0-1), reasoning.`,
     [
       {
         role: 'user',

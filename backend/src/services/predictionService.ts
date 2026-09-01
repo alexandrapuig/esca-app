@@ -24,6 +24,16 @@ type FridgeItemForPrediction = {
   unit: string | null;
 };
 
+function daysUntil(expiry: string | null): number {
+  const now = Date.now();
+  const expiryMs = expiry ? new Date(expiry).getTime() : now + 7 * 86400000;
+  return Math.max(0, Math.ceil((expiryMs - now) / 86400000));
+}
+
+function riskFromDays(days: number): 'low' | 'medium' | 'high' {
+  return days < 3 ? 'high' : days <= 7 ? 'medium' : 'low';
+}
+
 function fallbackPrediction(item: FridgeItemForPrediction): SpoilagePrediction {
   const now = Date.now();
   const expiryMs = item.estimated_expiry ? new Date(item.estimated_expiry).getTime() : now + 7 * 86400000;
@@ -92,10 +102,15 @@ export async function generatePredictionsForUser(params: {
         return fallbackPrediction(item);
       }
 
+      // days_until_expiry and risk_level are arithmetic, not judgement.
+      // Claude has repeatedly returned values inconsistent with the supplied
+      // estimated_expiry, so they are computed here and its values discarded.
+      const days = daysUntil(item.estimated_expiry);
+
       return {
         item_id: item.id,
-        risk_level: modelPrediction.risk_level,
-        days_until_expiry: modelPrediction.days_until_expiry,
+        risk_level: riskFromDays(days),
+        days_until_expiry: days,
         spoilage_probability_percent: modelPrediction.spoilage_probability_percent,
         confidence_score: modelPrediction.confidence_score,
         reasoning: modelPrediction.reasoning,
