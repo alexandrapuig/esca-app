@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   created_at           timestamp without time zone DEFAULT now(),
   name                 text,
   terms_accepted_at    timestamptz,
-  terms_version        text
+  terms_version        text,
+  household_id         uuid REFERENCES public.households(id) ON DELETE SET NULL
 );
 
 -- Added 2026-08-19. This FK was lost when public.users was dropped with CASCADE
@@ -74,6 +75,38 @@ ALTER TABLE public.users
 -- with no default, which is an assumption, not a confirmed fact.
 
 -- ---------------------------------------------------------------------------
+-- households / household_members
+-- ---------------------------------------------------------------------------
+--
+-- One household per user, enforced by UNIQUE (user_id) on household_members.
+-- Shared households are a paid feature; max_members defaults to 1 and the cap
+-- is enforced at the invite endpoint, not by a constraint.
+--
+-- RLS is ENABLED with NO POLICIES on both tables, which denies all access to
+-- anon/authenticated clients while the service key bypasses RLS as usual.
+-- Real policies come with the RLS rewrite once ownership is final.
+
+CREATE TABLE IF NOT EXISTS public.households (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        text,
+  max_members integer NOT NULL DEFAULT 1,
+  created_at  timestamptz DEFAULT now(),
+  updated_at  timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.household_members (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id uuid NOT NULL REFERENCES public.households(id) ON DELETE CASCADE,
+  user_id      uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  role         text NOT NULL DEFAULT 'member',
+  joined_at    timestamptz DEFAULT now(),
+  UNIQUE (user_id)
+);
+
+ALTER TABLE public.households        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.household_members ENABLE ROW LEVEL SECURITY;
+
+-- ---------------------------------------------------------------------------
 -- fridge_items
 -- ---------------------------------------------------------------------------
 
@@ -95,7 +128,8 @@ CREATE TABLE IF NOT EXISTS public.fridge_items (
   brand                   text,
   purchase_location       text,
   purchase_price          numeric,
-  notes                   text
+  notes                   text,
+  household_id            uuid REFERENCES public.households(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_fridge_items_user_id
