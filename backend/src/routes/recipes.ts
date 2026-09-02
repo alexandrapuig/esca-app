@@ -21,6 +21,7 @@ router.post('/generate', async (req, res) => {
 
   const result = await generateRecipesForUser({
     userId: request.user.id,
+    householdId: request.user.householdId,
   });
 
   if (!result.success) {
@@ -41,7 +42,7 @@ router.get('/', async (req, res) => {
   const request = getAuthenticatedRequest(req);
 
   const result = await listRecipesForUser({
-    userId: request.user.id,
+    householdId: request.user.householdId,
   });
 
   if (!result.success) {
@@ -72,12 +73,12 @@ router.put('/:id', async (req, res) => {
   }
 
   const updateInput: {
-    userId: string;
+    householdId: string;
     recipeId: string;
     saved?: boolean;
     cooked?: boolean;
   } = {
-    userId: request.user.id,
+    householdId: request.user.householdId,
     recipeId,
   };
 

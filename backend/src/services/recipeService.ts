@@ -43,6 +43,7 @@ function fallbackRecipes(atRiskItems: AtRiskItem[]): RecipeSuggestionResult[] {
 
 export async function generateRecipesForUser(params: {
   userId: string;
+  householdId: string;
 }): Promise<{ success: true; data: RecipeSuggestionResult[] } | { success: false; status: number; error: string }> {
   try {
     const supabase = getSupabaseAdminClient();
@@ -50,7 +51,7 @@ export async function generateRecipesForUser(params: {
     const { data: atRiskRows, error: atRiskError } = await supabase
       .from('latest_spoilage_predictions')
       .select('fridge_item_id, risk_level, fridge_items!inner(id, name, category)')
-      .eq('user_id', params.userId)
+      .eq('household_id', params.householdId)
       .in('risk_level', ['medium', 'high']);
 
     if (atRiskError) {
@@ -113,8 +114,19 @@ export async function generateRecipesForUser(params: {
     }
 
     if (recipes.length > 0) {
+      // Every generation previously appended, so unsaved suggestions piled up
+      // indefinitely. Clear the household's untouched ones first. Saved or
+      // cooked recipes survive.
+      await supabase
+        .from('recipe_suggestions')
+        .delete()
+        .eq('household_id', params.householdId)
+        .eq('saved', false)
+        .eq('cooked', false);
+
       const rows = recipes.map((recipe) => ({
         user_id: params.userId,
+        household_id: params.householdId,
         name: recipe.name,
         description: recipe.description,
         cuisine: recipe.cuisine,
@@ -142,7 +154,7 @@ export async function generateRecipesForUser(params: {
   }
 }
 
-export async function listRecipesForUser(params: { userId: string }): Promise<{
+export async function listRecipesForUser(params: { householdId: string }): Promise<{
   success: true;
   data: StoredRecipeSuggestion[];
 } | {
@@ -155,7 +167,7 @@ export async function listRecipesForUser(params: { userId: string }): Promise<{
     const { data, error } = await supabase
       .from('recipe_suggestions')
       .select('id, name, description, cuisine, dietary_tags, ingredients, instructions, difficulty, prep_time_minutes, reasoning, saved, cooked, created_at')
-      .eq('user_id', params.userId)
+      .eq('household_id', params.householdId)
       .order('created_at', { ascending: false })
       .returns<StoredRecipeSuggestion[]>();
 
@@ -181,7 +193,7 @@ export async function listRecipesForUser(params: { userId: string }): Promise<{
 }
 
 export async function updateRecipeSuggestionFlags(params: {
-  userId: string;
+  householdId: string;
   recipeId: string;
   saved?: boolean;
   cooked?: boolean;
@@ -206,7 +218,7 @@ export async function updateRecipeSuggestionFlags(params: {
       .from('recipe_suggestions')
       .update(updatePayload)
       .eq('id', params.recipeId)
-      .eq('user_id', params.userId)
+      .eq('household_id', params.householdId)
       .select('id, name, description, cuisine, dietary_tags, ingredients, instructions, difficulty, prep_time_minutes, reasoning, saved, cooked, created_at')
       .single<StoredRecipeSuggestion>();
 
