@@ -1,12 +1,14 @@
 import axios from 'axios';
 
-import { identifyBarcodeWithClaude } from './aiService';
+import { estimateShelfLifeWithClaude, identifyBarcodeWithClaude } from './aiService';
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 type BarcodeLookupResult = {
   name: string;
   category: string;
   typical_shelf_life_days: number;
+  brand?: string | null;
+  quantity_text?: string | null;
 };
 
 const categoryShelfLifeDefaults: Record<string, number> = {
@@ -42,6 +44,8 @@ function normalizeResult(result: BarcodeLookupResult): BarcodeLookupResult {
     name: result.name.trim(),
     category,
     typical_shelf_life_days: shelfLife,
+    brand: result.brand?.trim() || null,
+    quantity_text: result.quantity_text?.trim() || null,
   };
 }
 
@@ -52,9 +56,15 @@ async function getCachedBarcode(barcode: string): Promise<BarcodeLookupResult | 
   // nothing was ever cached.
   const { data, error } = await supabase
     .from('barcode_cache')
-    .select('product_name, category, shelf_life_days')
+    .select('product_name, category, shelf_life_days, brand, quantity_text')
     .eq('barcode', barcode)
-    .single<{ product_name: string; category: string; shelf_life_days: number }>();
+    .single<{
+      product_name: string;
+      category: string;
+      shelf_life_days: number;
+      brand: string | null;
+      quantity_text: string | null;
+    }>();
 
   if (error || !data) {
     return null;
@@ -64,6 +74,8 @@ async function getCachedBarcode(barcode: string): Promise<BarcodeLookupResult | 
     name: data.product_name,
     category: data.category,
     typical_shelf_life_days: data.shelf_life_days,
+    brand: data.brand,
+    quantity_text: data.quantity_text,
   });
 }
 
@@ -76,6 +88,8 @@ async function setCachedBarcode(barcode: string, result: BarcodeLookupResult): P
       product_name: result.name,
       category: result.category,
       shelf_life_days: result.typical_shelf_life_days,
+      brand: result.brand ?? null,
+      quantity_text: result.quantity_text ?? null,
     },
     { onConflict: 'barcode' },
   );
@@ -97,6 +111,8 @@ async function identifyWithOpenFoodFacts(barcode: string): Promise<BarcodeLookup
       | {
           product_name?: string;
           categories?: string;
+          brands?: string;
+          quantity?: string;
         }
       | undefined;
 
@@ -121,10 +137,18 @@ async function identifyWithOpenFoodFacts(barcode: string): Promise<BarcodeLookup
                   ? 'produce'
                   : 'other';
 
+    // Open Food Facts has no shelf life, so a real product record would
+    // otherwise fall back to a flat per-category default - which is how
+    // peanut butter ended up at 14 days. Ask Claude instead, and keep the
+    // default only if that fails.
+    const estimated = await estimateShelfLifeWithClaude({ name: product.product_name, category });
+
     return normalizeResult({
       name: product.product_name,
       category,
-      typical_shelf_life_days: categoryShelfLifeDefaults[category] ?? 14,
+      typical_shelf_life_days: estimated ?? categoryShelfLifeDefaults[category] ?? 14,
+      brand: product.brands?.split(',')[0]?.trim() || null,
+      quantity_text: product.quantity?.trim() || null,
     });
   } catch {
     return null;

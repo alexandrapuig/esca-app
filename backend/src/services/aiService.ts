@@ -136,6 +136,45 @@ export async function identifyBarcodeWithClaude(params: {
   };
 }
 
+/**
+ * Open Food Facts knows what a product is but not how long it keeps. This asks
+ * for a shelf life from the product name and category alone, so a real product
+ * record does not fall back to a flat per-category default.
+ */
+export async function estimateShelfLifeWithClaude(params: {
+  name: string;
+  category: string;
+}): Promise<number | null> {
+  try {
+    const output = await callClaude(
+      'You estimate how long an unopened grocery product stays good from its purchase date. Return strict JSON only: {"typical_shelf_life_days": <integer>}. Consider the product type: shelf-stable pantry goods last months to years, fresh produce and dairy days to weeks. Give the unopened shelf life.',
+      [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ name: params.name, category: params.category }),
+            },
+          ],
+        },
+      ],
+      200,
+    );
+
+    const parsed = JSON.parse(extractJsonFromText(output)) as { typical_shelf_life_days?: number };
+
+    if (typeof parsed.typical_shelf_life_days !== 'number' || !Number.isFinite(parsed.typical_shelf_life_days)) {
+      return null;
+    }
+
+    return Math.max(1, Math.floor(parsed.typical_shelf_life_days));
+  } catch (error) {
+    console.error('estimateShelfLifeWithClaude failed', error);
+    return null;
+  }
+}
+
 export type SpoilagePredictionResult = {
   item_id: string;
   risk_level: 'low' | 'medium' | 'high';

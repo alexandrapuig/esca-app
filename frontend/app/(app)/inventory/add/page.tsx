@@ -120,6 +120,32 @@ export default function AddInventoryItemPage() {
           : 'other';
 
         setCategory(identifiedCategory);
+
+        // Only fill fields the user has left empty - a scan should never
+        // overwrite something already typed.
+        if (!brand.trim() && identification.data.brand) {
+          setBrand(identification.data.brand);
+        }
+
+        // Open Food Facts gives quantity as one string: "454 g", "500 ml".
+        // Split the leading number from the unit; if it does not parse, leave
+        // both fields alone rather than guessing.
+        if (identification.data.quantity_text) {
+          const match = /^([\d.,]+)\s*(.*)$/.exec(identification.data.quantity_text.trim());
+
+          if (match) {
+            const parsedQuantity = match[1].replace(',', '.');
+            const parsedUnit = match[2].trim();
+
+            if (!quantity.trim() && parsedQuantity) {
+              setQuantity(parsedQuantity);
+            }
+
+            if (!unit.trim() && parsedUnit) {
+              setUnit(parsedUnit);
+            }
+          }
+        }
       }
 
       setIsIdentifying(false);

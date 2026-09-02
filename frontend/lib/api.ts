@@ -34,6 +34,8 @@ export type BarcodeIdentification = {
   name: string;
   category: string;
   typical_shelf_life_days: number;
+  brand?: string | null;
+  quantity_text?: string | null;
 };
 
 export type UserProfile = {
