@@ -23,7 +23,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 backdrop-blur">
-        <nav className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-4 md:px-12">
+        <nav className="mx-auto flex max-w-7xl items-center gap-6 px-6 py-4 md:px-12">
           <Link href="/dashboard" className="font-serif text-2xl text-emerald-900">
             Esca
           </Link>
