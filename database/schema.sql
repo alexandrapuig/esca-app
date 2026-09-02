@@ -103,6 +103,9 @@ CREATE TABLE IF NOT EXISTS public.household_members (
   UNIQUE (user_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_household_members_household_id
+  ON public.household_members USING btree (household_id);
+
 ALTER TABLE public.households        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.household_members ENABLE ROW LEVEL SECURITY;
 
@@ -129,11 +132,13 @@ CREATE TABLE IF NOT EXISTS public.fridge_items (
   purchase_location       text,
   purchase_price          numeric,
   notes                   text,
-  household_id            uuid REFERENCES public.households(id) ON DELETE CASCADE
+  household_id            uuid NOT NULL REFERENCES public.households(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_fridge_items_user_id
   ON public.fridge_items USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_fridge_items_household_id
+  ON public.fridge_items USING btree (household_id);
 CREATE INDEX IF NOT EXISTS idx_fridge_items_storage_location
   ON public.fridge_items USING btree (storage_location);
 
@@ -162,13 +167,15 @@ CREATE TABLE IF NOT EXISTS public.spoilage_predictions (
   reasoning                    text,
   created_at                   timestamptz DEFAULT now(),
   updated_at                   timestamptz DEFAULT now(),
-  household_id                 uuid REFERENCES public.households(id)
+  household_id                 uuid NOT NULL REFERENCES public.households(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_spoilage_predictions_user_id
   ON public.spoilage_predictions USING btree (user_id);
 CREATE INDEX IF NOT EXISTS idx_spoilage_predictions_fridge_item_id
   ON public.spoilage_predictions USING btree (fridge_item_id);
+CREATE INDEX IF NOT EXISTS idx_spoilage_predictions_household_id
+  ON public.spoilage_predictions USING btree (household_id);
 
 -- ---------------------------------------------------------------------------
 -- latest_spoilage_predictions (view)
@@ -218,11 +225,13 @@ CREATE TABLE IF NOT EXISTS public.recipe_suggestions (
   reasoning         text,
   created_at        timestamptz DEFAULT now(),
   updated_at        timestamptz DEFAULT now(),
-  household_id      uuid REFERENCES public.households(id)
+  household_id      uuid NOT NULL REFERENCES public.households(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_recipe_suggestions_user_id
   ON public.recipe_suggestions USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_recipe_suggestions_household_id
+  ON public.recipe_suggestions USING btree (household_id);
 
 -- ---------------------------------------------------------------------------
 -- barcode_cache
@@ -362,17 +371,18 @@ CREATE POLICY "Authenticated users can insert barcode cache"
 --
 --    The other tables have four policies each; this one has three.
 --
--- 5. household_id IS NULLABLE ON ALL THREE CHILD TABLES
+-- 5. users.household_id IS NULLABLE — DELIBERATELY
 --
---    fridge_items, spoilage_predictions, and recipe_suggestions all allow a
---    null household_id. Backfilled to 0 nulls on 2026-09-02, but nothing stops
---    a future null. Tighten to NOT NULL once all writers set it.
+--    authenticateUser inserts the user row first and provisions the household
+--    second, so a null is legitimate in that window. Constraining it would
+--    break signup. The three child tables ARE constrained (2026-09-02).
 --
--- 6. NO INDEX ON household_id ANYWHERE
+-- 6. THE user_id INDEXES ARE NOW DEAD WEIGHT ON THE READ PATHS
 --
---    Every fridge, prediction, and recipe read now filters on household_id and
---    every one of them is a sequential scan. The user_id indexes are now dead
---    weight on the read paths. Not urgent at current row counts.
+--    Nothing filters on user_id any more; it is kept for attribution only.
+--    idx_fridge_items_user_id, idx_spoilage_predictions_user_id, and
+--    idx_recipe_suggestions_user_id could be dropped, but they are cheap at
+--    current row counts and would be needed again if per-member views appear.
 --
 -- ===========================================================================
 -- RESOLVED
