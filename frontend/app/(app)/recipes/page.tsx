@@ -19,6 +19,7 @@ function difficultyStyles(level: RecipeSuggestion['difficulty']): string {
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState<RecipeSuggestion[]>([]);
+  const [filter, setFilter] = useState<'all' | 'new' | 'saved'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -73,6 +74,20 @@ export default function RecipesPage() {
     setRecipes((current) => current.map((recipe) => (recipe.id === recipeId ? result.data : recipe)));
   }
 
+  // Saved deliberately includes cooked recipes: both survive the dedupe that
+  // runs on every generation, so they are the ones the user chose to keep.
+  const visibleRecipes = recipes.filter((recipe) => {
+    if (filter === 'saved') {
+      return recipe.saved || recipe.cooked;
+    }
+
+    if (filter === 'new') {
+      return !recipe.saved && !recipe.cooked;
+    }
+
+    return true;
+  });
+
   return (
     <main className="min-h-screen bg-white px-6 py-10 text-gray-900 md:px-12 md:py-16">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
@@ -102,6 +117,24 @@ export default function RecipesPage() {
           </div>
         </header>
 
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-gray-600">Show:</span>
+          {(['all', 'new', 'saved'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setFilter(value)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                filter === value
+                  ? 'bg-emerald-900 text-white'
+                  : 'border border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+              }`}
+            >
+              {value[0].toUpperCase() + value.slice(1)}
+            </button>
+          ))}
+        </div>
+
         {errorMessage ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{errorMessage}</div>
         ) : null}
@@ -113,6 +146,19 @@ export default function RecipesPage() {
           </section>
         ) : null}
 
+        {!isLoading && visibleRecipes.length === 0 && recipes.length > 0 ? (
+          <section className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-12 text-center">
+            <h2 className="font-serif text-2xl leading-snug text-gray-900">
+              {filter === 'saved' ? 'Nothing saved yet' : 'No new suggestions'}
+            </h2>
+            <p className="mt-2 text-sm font-light text-gray-600">
+              {filter === 'saved'
+                ? 'Save or cook a recipe to keep it here. Everything else is replaced when you generate again.'
+                : 'Generate recipes to see fresh suggestions.'}
+            </p>
+          </section>
+        ) : null}
+
         {!isLoading && recipes.length === 0 ? (
           <section className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-12 text-center">
             <h2 className="font-serif text-2xl leading-snug text-gray-900">No recipes yet</h2>
@@ -120,9 +166,9 @@ export default function RecipesPage() {
           </section>
         ) : null}
 
-        {!isLoading && recipes.length > 0 ? (
+        {!isLoading && visibleRecipes.length > 0 ? (
           <section className="grid gap-6 md:gap-8">
-            {recipes.map((recipe) => (
+            {visibleRecipes.map((recipe) => (
               <article key={recipe.id} className="overflow-hidden rounded-2xl border border-gray-200 transition hover:shadow-lg md:grid md:grid-cols-[320px_1fr]">
                 <div
                   className="h-64 bg-cover bg-center md:h-full"
