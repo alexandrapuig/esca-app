@@ -16,6 +16,7 @@ router.post('/generate', async (req, res) => {
 
   const result = await generatePredictionsForUser({
     userId: request.user.id,
+    householdId: request.user.householdId,
   });
 
   if (!result.success) {
@@ -36,7 +37,7 @@ router.get('/latest', async (req, res) => {
   const request = getAuthenticatedRequest(req);
 
   const result = await getLatestPredictionsForUser({
-    userId: request.user.id,
+    householdId: request.user.householdId,
   });
 
   if (!result.success) {

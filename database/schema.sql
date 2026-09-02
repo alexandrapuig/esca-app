@@ -161,13 +161,41 @@ CREATE TABLE IF NOT EXISTS public.spoilage_predictions (
   confidence_score             numeric DEFAULT 0,
   reasoning                    text,
   created_at                   timestamptz DEFAULT now(),
-  updated_at                   timestamptz DEFAULT now()
+  updated_at                   timestamptz DEFAULT now(),
+  household_id                 uuid REFERENCES public.households(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_spoilage_predictions_user_id
   ON public.spoilage_predictions USING btree (user_id);
 CREATE INDEX IF NOT EXISTS idx_spoilage_predictions_fridge_item_id
   ON public.spoilage_predictions USING btree (fridge_item_id);
+
+-- ---------------------------------------------------------------------------
+-- latest_spoilage_predictions (view)
+-- ---------------------------------------------------------------------------
+--
+-- Added to this file 2026-09-02. The view existed in the live database from the
+-- start but was never recorded here.
+--
+-- Runs with owner permissions and does NOT enforce RLS on spoilage_predictions.
+-- Moot while the service key bypasses RLS; must be revisited if RLS is fixed.
+--
+-- CREATE OR REPLACE VIEW can only append columns, which is why household_id is
+-- last rather than beside user_id.
+
+CREATE OR REPLACE VIEW public.latest_spoilage_predictions AS
+  SELECT DISTINCT ON (fridge_item_id) id,
+    fridge_item_id,
+    user_id,
+    risk_level,
+    days_until_expiry,
+    spoilage_probability_percent,
+    confidence_score,
+    reasoning,
+    created_at,
+    household_id
+  FROM public.spoilage_predictions
+  ORDER BY fridge_item_id, created_at DESC;
 
 -- ---------------------------------------------------------------------------
 -- recipe_suggestions
@@ -189,7 +217,8 @@ CREATE TABLE IF NOT EXISTS public.recipe_suggestions (
   description       text,
   reasoning         text,
   created_at        timestamptz DEFAULT now(),
-  updated_at        timestamptz DEFAULT now()
+  updated_at        timestamptz DEFAULT now(),
+  household_id      uuid REFERENCES public.households(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_recipe_suggestions_user_id
@@ -332,6 +361,18 @@ CREATE POLICY "Authenticated users can insert barcode cache"
 -- 4. NO DELETE POLICY ON spoilage_predictions
 --
 --    The other tables have four policies each; this one has three.
+--
+-- 5. household_id IS NULLABLE ON ALL THREE CHILD TABLES
+--
+--    fridge_items, spoilage_predictions, and recipe_suggestions all allow a
+--    null household_id. Backfilled to 0 nulls on 2026-09-02, but nothing stops
+--    a future null. Tighten to NOT NULL once all writers set it.
+--
+-- 6. NO INDEX ON household_id ANYWHERE
+--
+--    Every fridge, prediction, and recipe read now filters on household_id and
+--    every one of them is a sequential scan. The user_id indexes are now dead
+--    weight on the read paths. Not urgent at current row counts.
 --
 -- ===========================================================================
 -- RESOLVED

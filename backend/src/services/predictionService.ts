@@ -53,13 +53,14 @@ function fallbackPrediction(item: FridgeItemForPrediction): SpoilagePrediction {
 
 export async function generatePredictionsForUser(params: {
   userId: string;
+  householdId: string;
 }): Promise<{ success: true; data: SpoilagePrediction[] } | { success: false; status: number; error: string }> {
   try {
     const supabase = getSupabaseAdminClient();
     const { data: items, error: itemsError } = await supabase
       .from('fridge_items')
       .select('id, user_id, name, category, estimated_expiry, quantity, unit')
-      .eq('user_id', params.userId)
+      .eq('household_id', params.householdId)
       .eq('status', 'fresh')
       .returns<FridgeItemForPrediction[]>();
 
@@ -119,6 +120,7 @@ export async function generatePredictionsForUser(params: {
 
     const upsertRows = normalized.map((prediction) => ({
       user_id: params.userId,
+      household_id: params.householdId,
       fridge_item_id: prediction.item_id,
       risk_level: prediction.risk_level,
       days_until_expiry: prediction.days_until_expiry,
@@ -158,7 +160,7 @@ export async function generatePredictionsForUser(params: {
   }
 }
 
-export async function getLatestPredictionsForUser(params: { userId: string }): Promise<{
+export async function getLatestPredictionsForUser(params: { householdId: string }): Promise<{
   success: true;
   data: SpoilagePrediction[];
 } | {
@@ -171,7 +173,7 @@ export async function getLatestPredictionsForUser(params: { userId: string }): P
     const { data, error } = await supabase
       .from('latest_spoilage_predictions')
       .select('fridge_item_id, risk_level, days_until_expiry, spoilage_probability_percent, confidence_score, reasoning')
-      .eq('user_id', params.userId)
+      .eq('household_id', params.householdId)
       .returns<SpoilagePredictionRow[]>();
 
     if (error) {
