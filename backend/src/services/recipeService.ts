@@ -50,8 +50,9 @@ export async function generateRecipesForUser(params: {
 
     const { data: atRiskRows, error: atRiskError } = await supabase
       .from('latest_spoilage_predictions')
-      .select('fridge_item_id, risk_level, fridge_items!inner(id, name, category)')
+      .select('fridge_item_id, risk_level, fridge_items!inner(id, name, category, status)')
       .eq('household_id', params.householdId)
+      .eq('fridge_items.status', 'fresh')
       .in('risk_level', ['medium', 'high']);
 
     if (atRiskError) {
