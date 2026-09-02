@@ -282,13 +282,6 @@ export default function InventoryPage() {
                           <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
-                              className="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-700 transition hover:border-stone-500"
-                              onClick={() => handleStatusUpdate(item.id, 'fresh')}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
                               className="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
                               onClick={() => handleStatusUpdate(item.id, 'consumed')}
                             >
@@ -339,13 +332,6 @@ export default function InventoryPage() {
                       Quantity: {item.quantity ? `${item.quantity}${item.unit ? ` ${item.unit}` : ''}` : '-'}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-700"
-                        onClick={() => handleStatusUpdate(item.id, 'fresh')}
-                      >
-                        Edit
-                      </button>
                       <button
                         type="button"
                         className="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700"
