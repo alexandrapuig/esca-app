@@ -126,6 +126,7 @@ function estimateExpiryDate(category: FridgeCategory, purchaseDate: Date): Date 
 
 export async function createFridgeItem(params: {
   userId: string;
+  householdId: string;
   name: string;
   category?: string;
   quantity?: number;
@@ -172,6 +173,7 @@ export async function createFridgeItem(params: {
 
   const row = {
     user_id: params.userId,
+    household_id: params.householdId,
     name: params.name.trim(),
     category: normalizedCategory,
     quantity: params.quantity ?? null,
@@ -210,7 +212,7 @@ export async function createFridgeItem(params: {
 }
 
 export async function listFridgeItems(params: {
-  userId: string;
+  householdId: string;
   status?: string;
 }): Promise<ServiceResult<FridgeItem[]>> {
   let supabase: SupabaseClient;
@@ -227,7 +229,7 @@ export async function listFridgeItems(params: {
     .select(
       FRIDGE_ITEM_COLUMNS,
     )
-    .eq('user_id', params.userId)
+    .eq('household_id', params.householdId)
     .order('purchase_date', { ascending: false });
 
   if (params.status === 'fresh' || params.status === 'consumed' || params.status === 'expired') {
@@ -251,7 +253,7 @@ export async function listFridgeItems(params: {
 }
 
 export async function updateFridgeItemStatus(params: {
-  userId: string;
+  householdId: string;
   itemId: string;
   status: FridgeStatus;
 }): Promise<ServiceResult<FridgeItem>> {
@@ -268,7 +270,7 @@ export async function updateFridgeItemStatus(params: {
     .from('fridge_items')
     .update({ status: params.status })
     .eq('id', params.itemId)
-    .eq('user_id', params.userId)
+    .eq('household_id', params.householdId)
     .select(
       FRIDGE_ITEM_COLUMNS,
     )
@@ -297,7 +299,7 @@ export async function updateFridgeItemStatus(params: {
 }
 
 export async function deleteFridgeItem(params: {
-  userId: string;
+  householdId: string;
   itemId: string;
 }): Promise<ServiceResult<null>> {
   let supabase: SupabaseClient;
@@ -313,7 +315,7 @@ export async function deleteFridgeItem(params: {
     .from('fridge_items')
     .delete()
     .eq('id', params.itemId)
-    .eq('user_id', params.userId)
+    .eq('household_id', params.householdId)
     .select('id')
     .single<{ id: string }>();
 

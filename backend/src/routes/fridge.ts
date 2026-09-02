@@ -47,6 +47,7 @@ router.post('/items', async (req, res) => {
 
   const createInput: {
     userId: string;
+    householdId: string;
     name: string;
     category?: string;
     quantity?: number;
@@ -59,6 +60,7 @@ router.post('/items', async (req, res) => {
     purchaseDate?: string;
   } = {
     userId: request.user.id,
+    householdId: request.user.householdId,
     name: body.name,
   };
 
@@ -119,10 +121,10 @@ router.get('/items', async (req, res) => {
   const status = typeof req.query.status === 'string' ? req.query.status : undefined;
 
   const listInput: {
-    userId: string;
+    householdId: string;
     status?: string;
   } = {
-    userId: request.user.id,
+    householdId: request.user.householdId,
   };
 
   if (typeof status === 'string') {
@@ -159,7 +161,7 @@ router.put('/items/:id', async (req, res) => {
   }
 
   const result = await updateFridgeItemStatus({
-    userId: request.user.id,
+    householdId: request.user.householdId,
     itemId,
     status: body.status,
   });
@@ -183,7 +185,7 @@ router.delete('/items/:id', async (req, res) => {
   const itemId = req.params.id;
 
   const result = await deleteFridgeItem({
-    userId: request.user.id,
+    householdId: request.user.householdId,
     itemId,
   });
 
