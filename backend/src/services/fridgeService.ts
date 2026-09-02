@@ -298,6 +298,133 @@ export async function updateFridgeItemStatus(params: {
   };
 }
 
+export async function updateFridgeItem(params: {
+  householdId: string;
+  itemId: string;
+  name?: string;
+  category?: string;
+  quantity?: number | null;
+  unit?: string | null;
+  typicalShelfLifeDays?: number | null;
+  estimatedExpiry?: string | null;
+  purchaseDate?: string;
+  status?: FridgeStatus;
+  brand?: string | null;
+  purchaseLocation?: string | null;
+  purchasePrice?: number | null;
+  notes?: string | null;
+}): Promise<ServiceResult<FridgeItem>> {
+  let supabase: SupabaseClient;
+
+  try {
+    supabase = getSupabaseAdminClient();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Supabase is not configured';
+    return { success: false, status: 500, error: message };
+  }
+
+  // Only fields actually present are written, so an omitted field is left
+  // alone. An explicit null clears an optional column. user_id and
+  // household_id are never editable.
+  const updates: Record<string, unknown> = {};
+
+  if (typeof params.name === 'string' && params.name.trim()) {
+    updates.name = params.name.trim();
+  }
+
+  if (typeof params.category === 'string') {
+    updates.category = normalizeCategory(params.category);
+  }
+
+  if (params.quantity !== undefined) {
+    updates.quantity = params.quantity;
+  }
+
+  if (params.unit !== undefined) {
+    updates.unit = params.unit?.trim() || null;
+  }
+
+  if (params.typicalShelfLifeDays !== undefined) {
+    updates.typical_shelf_life_days =
+      typeof params.typicalShelfLifeDays === 'number' && Number.isFinite(params.typicalShelfLifeDays)
+        ? Math.max(1, Math.floor(params.typicalShelfLifeDays))
+        : null;
+  }
+
+  if (params.estimatedExpiry !== undefined) {
+    updates.estimated_expiry = params.estimatedExpiry || null;
+  }
+
+  if (typeof params.purchaseDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.purchaseDate)) {
+    updates.purchase_date = params.purchaseDate;
+  }
+
+  if (params.status) {
+    updates.status = params.status;
+  }
+
+  if (params.brand !== undefined) {
+    updates.brand = params.brand?.trim() || null;
+  }
+
+  if (params.purchaseLocation !== undefined) {
+    updates.purchase_location = params.purchaseLocation?.trim() || null;
+  }
+
+  if (params.purchasePrice !== undefined) {
+    updates.purchase_price =
+      typeof params.purchasePrice === 'number' &&
+      Number.isFinite(params.purchasePrice) &&
+      params.purchasePrice >= 0
+        ? Math.round(params.purchasePrice * 100) / 100
+        : null;
+  }
+
+  if (params.notes !== undefined) {
+    updates.notes = params.notes?.trim() || null;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return {
+      success: false,
+      status: 400,
+      error: 'No valid fields to update',
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('fridge_items')
+    .update(updates)
+    .eq('id', params.itemId)
+    .eq('household_id', params.householdId)
+    .select(
+      FRIDGE_ITEM_COLUMNS,
+    )
+    .single<FridgeItemRow>();
+
+  if (error) {
+    console.error('updateFridgeItem failed', { itemId: params.itemId, updates, error });
+    return {
+      success: false,
+      status: 500,
+      error: 'Unable to update fridge item',
+    };
+  }
+
+  if (!data) {
+    return {
+      success: false,
+      status: 404,
+      error: 'Fridge item not found',
+    };
+  }
+
+  return {
+    success: true,
+    data: mapFridgeItem(data),
+  };
+}
+
 export async function deleteFridgeItem(params: {
   householdId: string;
   itemId: string;

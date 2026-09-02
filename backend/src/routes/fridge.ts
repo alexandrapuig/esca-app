@@ -4,7 +4,7 @@ import {
   createFridgeItem,
   deleteFridgeItem,
   listFridgeItems,
-  updateFridgeItemStatus,
+  updateFridgeItem,
 } from '../services/fridgeService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
 
@@ -22,7 +22,18 @@ type CreateFridgeItemBody = {
 };
 
 type UpdateFridgeItemBody = {
+  name?: string;
+  category?: string;
+  quantity?: number | null;
+  unit?: string | null;
+  typical_shelf_life_days?: number | null;
+  estimated_expiry?: string | null;
+  purchase_date?: string;
   status?: string;
+  brand?: string | null;
+  purchase_location?: string | null;
+  purchase_price?: number | null;
+  notes?: string | null;
 };
 
 const router = Router();
@@ -152,7 +163,14 @@ router.put('/items/:id', async (req, res) => {
   const request = getAuthenticatedRequest(req);
   const itemId = req.params.id;
 
-  if (body.status !== 'consumed' && body.status !== 'expired' && body.status !== 'fresh') {
+  // status is now one optional field among many rather than required. Only
+  // validated when present, so status-only calls behave exactly as before.
+  if (
+    body.status !== undefined &&
+    body.status !== 'consumed' &&
+    body.status !== 'expired' &&
+    body.status !== 'fresh'
+  ) {
     res.status(400).json({
       success: false,
       error: 'Status must be one of: fresh, consumed, expired',
@@ -160,11 +178,60 @@ router.put('/items/:id', async (req, res) => {
     return;
   }
 
-  const result = await updateFridgeItemStatus({
+  const updateInput: Parameters<typeof updateFridgeItem>[0] = {
     householdId: request.user.householdId,
     itemId,
-    status: body.status,
-  });
+  };
+
+  if (typeof body.name === 'string') {
+    updateInput.name = body.name;
+  }
+
+  if (typeof body.category === 'string') {
+    updateInput.category = body.category;
+  }
+
+  if (body.quantity !== undefined) {
+    updateInput.quantity = body.quantity;
+  }
+
+  if (body.unit !== undefined) {
+    updateInput.unit = body.unit;
+  }
+
+  if (body.typical_shelf_life_days !== undefined) {
+    updateInput.typicalShelfLifeDays = body.typical_shelf_life_days;
+  }
+
+  if (body.estimated_expiry !== undefined) {
+    updateInput.estimatedExpiry = body.estimated_expiry;
+  }
+
+  if (typeof body.purchase_date === 'string') {
+    updateInput.purchaseDate = body.purchase_date;
+  }
+
+  if (body.status !== undefined) {
+    updateInput.status = body.status;
+  }
+
+  if (body.brand !== undefined) {
+    updateInput.brand = body.brand;
+  }
+
+  if (body.purchase_location !== undefined) {
+    updateInput.purchaseLocation = body.purchase_location;
+  }
+
+  if (body.purchase_price !== undefined) {
+    updateInput.purchasePrice = body.purchase_price;
+  }
+
+  if (body.notes !== undefined) {
+    updateInput.notes = body.notes;
+  }
+
+  const result = await updateFridgeItem(updateInput);
 
   if (!result.success) {
     res.status(result.status).json({
