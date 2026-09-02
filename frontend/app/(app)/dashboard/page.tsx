@@ -4,14 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { getCurrentUser, getSupabaseClient, signOut } from '@/lib/supabase';
+import { getCurrentUser, signOut } from '@/lib/supabase';
 import { getUserStats, type UserStats } from '@/lib/api';
-
-type UserProfile = {
-  id: string;
-  email: string;
-  created_at: string;
-};
 
 const STAT_CARDS: Array<{
   title: string;
@@ -31,9 +25,6 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-  const [authUserId, setAuthUserId] = useState('');
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
 
   useEffect(() => {
@@ -46,42 +37,11 @@ export default function DashboardPage() {
           return;
         }
 
-        setUserEmail(user.email);
-        setAuthUserId(user.id);
-
-        // Get access token from Supabase session
-        const supabase = getSupabaseClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        const accessToken = session?.access_token;
-
-        if (!accessToken) {
-          setErrorMessage('No access token available');
-          setIsLoading(false);
-          return;
-        }
-
-        // Call backend API to fetch user profile
-
         const statsResult = await getUserStats();
+
         if (statsResult.success) {
           setStats(statsResult.data);
         }
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/profile`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        const payload = (await response.json()) as { success: boolean; data?: UserProfile; error?: string };
-
-        if (!response.ok || !payload.success || !payload.data) {
-          throw new Error(payload.error || 'Failed to fetch user profile');
-        }
-
-        setProfile(payload.data);
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Unknown error');
         setErrorMessage(error.message);
@@ -176,30 +136,6 @@ export default function DashboardPage() {
               AI-powered recipes from your expiring items
             </p>
           </Link>
-        </section>
-
-        <section className="rounded-2xl border border-gray-200 p-6 md:p-8">
-          <p className="text-sm font-medium uppercase tracking-wide text-gray-500">Account details</p>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-lg bg-gray-50 p-5">
-              <p className="text-sm text-gray-500">Email</p>
-              <p className="mt-3 break-all text-lg font-medium text-gray-900">{userEmail}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-5">
-              <p className="text-sm text-gray-500">Auth user ID</p>
-              <p className="mt-3 break-all text-sm font-medium text-gray-900">{authUserId}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-5">
-              <p className="text-sm text-gray-500">Profile row ID</p>
-              <p className="mt-3 break-all text-sm font-medium text-gray-900">{profile?.id ?? 'Loading...'}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-5">
-              <p className="text-sm text-gray-500">Created</p>
-              <p className="mt-3 text-sm font-medium text-gray-900">
-                {profile?.created_at ? new Date(profile.created_at).toLocaleString() : 'Loading...'}
-              </p>
-            </div>
-          </div>
         </section>
 
         <button
