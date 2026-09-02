@@ -74,16 +74,19 @@ export default function InventoryPage() {
     return predictions.find((prediction) => prediction.item_id === itemId) ?? null;
   }
 
+  // risk_level is computed by the backend from estimated_expiry. Deriving it
+  // again here would mean two copies of the same rule, and any change to the
+  // backend thresholds would silently not apply.
   function getRiskBadgeStyles(prediction: SpoilagePrediction | null): string {
     if (!prediction) {
       return 'bg-stone-100 text-stone-700';
     }
 
-    if (prediction.days_until_expiry < 3) {
+    if (prediction.risk_level === 'high') {
       return 'bg-red-100 text-red-800';
     }
 
-    if (prediction.days_until_expiry <= 7) {
+    if (prediction.risk_level === 'medium') {
       return 'bg-amber-100 text-amber-900';
     }
 
@@ -95,11 +98,11 @@ export default function InventoryPage() {
       return 'No prediction';
     }
 
-    if (prediction.days_until_expiry < 3) {
+    if (prediction.risk_level === 'high') {
       return 'High risk';
     }
 
-    if (prediction.days_until_expiry <= 7) {
+    if (prediction.risk_level === 'medium') {
       return 'Medium risk';
     }
 
