@@ -4,6 +4,7 @@ export type AuthenticatedUser = {
   id: string;
   email: string;
   createdAt: string;
+  householdId: string;
 };
 
 type AuthResult =
@@ -83,7 +84,9 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
     };
   }
 
-  if (!upsertedRow.household_id) {
+  let householdId: string | null = upsertedRow.household_id ?? null;
+
+  if (!householdId) {
     const householdError = await ensureHousehold(supabase, upsertedRow.id, normalizedEmail);
 
     if (householdError) {
@@ -97,6 +100,26 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
         error: 'Unable to provision household',
       };
     }
+
+    // ensureHousehold writes users.household_id, but upsertedRow is a stale
+    // local copy read before that write. In the 23505 race path the surviving
+    // household belongs to the request that won. Re-read instead of guessing.
+    const { data: linkedRow } = await supabase
+      .from('users')
+      .select('household_id')
+      .eq('id', upsertedRow.id)
+      .single<{ household_id: string | null }>();
+
+    householdId = linkedRow?.household_id ?? null;
+  }
+
+  if (!householdId) {
+    console.error('no household after provisioning', { user_id: upsertedRow.id });
+    return {
+      success: false,
+      status: 500,
+      error: 'Unable to resolve household',
+    };
   }
 
   return {
@@ -105,6 +128,7 @@ export async function authenticateUser(accessToken: string): Promise<AuthResult>
       id: upsertedRow.id,
       email: normalizedEmail,
       createdAt: upsertedRow.created_at ?? now,
+      householdId,
     },
   };
 }
