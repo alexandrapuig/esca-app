@@ -291,6 +291,12 @@ export default function InventoryPage() {
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex flex-wrap gap-2">
+                            <Link
+                              href={`/inventory/${item.id}/edit`}
+                              className="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-700 transition hover:border-stone-500"
+                            >
+                              Edit
+                            </Link>
                             <button
                               type="button"
                               className="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
@@ -343,6 +349,12 @@ export default function InventoryPage() {
                       Quantity: {item.quantity ? `${item.quantity}${item.unit ? ` ${item.unit}` : ''}` : '-'}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
+                      <Link
+                        href={`/inventory/${item.id}/edit`}
+                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-700"
+                      >
+                        Edit
+                      </Link>
                       <button
                         type="button"
                         className="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700"

@@ -165,6 +165,29 @@ export async function updateFridgeItemStatus(
   });
 }
 
+export async function updateFridgeItem(
+  id: string,
+  input: {
+    name?: string;
+    category?: string;
+    quantity?: number | null;
+    unit?: string | null;
+    typical_shelf_life_days?: number | null;
+    estimated_expiry?: string | null;
+    purchase_date?: string;
+    status?: 'fresh' | 'consumed' | 'expired';
+    brand?: string | null;
+    purchase_location?: string | null;
+    purchase_price?: number | null;
+    notes?: string | null;
+  },
+): Promise<ApiResult<FridgeItem>> {
+  return apiRequest<FridgeItem>(`/api/fridge/items/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
 export async function deleteFridgeItem(id: string): Promise<ApiResult<{ deleted: true }>> {
   const accessToken = await getAccessToken();
 
