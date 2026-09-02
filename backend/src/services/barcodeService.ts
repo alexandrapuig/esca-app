@@ -47,32 +47,42 @@ function normalizeResult(result: BarcodeLookupResult): BarcodeLookupResult {
 
 async function getCachedBarcode(barcode: string): Promise<BarcodeLookupResult | null> {
   const supabase = getSupabaseAdminClient();
+  // barcode_cache uses product_name and shelf_life_days. These differ from
+  // fridge_items on purpose; naming them wrong here failed silently and meant
+  // nothing was ever cached.
   const { data, error } = await supabase
     .from('barcode_cache')
-    .select('name, category, typical_shelf_life_days')
+    .select('product_name, category, shelf_life_days')
     .eq('barcode', barcode)
-    .single<{ name: string; category: string; typical_shelf_life_days: number }>();
+    .single<{ product_name: string; category: string; shelf_life_days: number }>();
 
   if (error || !data) {
     return null;
   }
 
-  return normalizeResult(data);
+  return normalizeResult({
+    name: data.product_name,
+    category: data.category,
+    typical_shelf_life_days: data.shelf_life_days,
+  });
 }
 
 async function setCachedBarcode(barcode: string, result: BarcodeLookupResult): Promise<void> {
   const supabase = getSupabaseAdminClient();
 
-  await supabase.from('barcode_cache').upsert(
+  const { error } = await supabase.from('barcode_cache').upsert(
     {
       barcode,
-      name: result.name,
+      product_name: result.name,
       category: result.category,
-      typical_shelf_life_days: result.typical_shelf_life_days,
-      last_identified_at: new Date().toISOString(),
+      shelf_life_days: result.typical_shelf_life_days,
     },
     { onConflict: 'barcode' },
   );
+
+  if (error) {
+    console.error('barcode cache write failed', { barcode, error });
+  }
 }
 
 async function identifyWithOpenFoodFacts(barcode: string): Promise<BarcodeLookupResult | null> {
@@ -145,15 +155,9 @@ export async function identifyBarcode(params: {
       };
     }
 
-    if (params.barcodeImage) {
-      const claudeResult = normalizeResult(await identifyBarcodeWithClaude({ barcode, barcodeImage: params.barcodeImage }));
-      await setCachedBarcode(barcode, claudeResult);
-      return {
-        success: true,
-        data: claudeResult,
-      };
-    }
-
+    // Open Food Facts is real product data keyed on the GTIN; Claude is
+    // inference. The image branch used to run first, and the frontend always
+    // sends an image, so this lookup was never reached.
     const offResult = await identifyWithOpenFoodFacts(barcode);
 
     if (offResult) {
@@ -161,6 +165,15 @@ export async function identifyBarcode(params: {
       return {
         success: true,
         data: offResult,
+      };
+    }
+
+    if (params.barcodeImage) {
+      const claudeResult = normalizeResult(await identifyBarcodeWithClaude({ barcode, barcodeImage: params.barcodeImage }));
+      await setCachedBarcode(barcode, claudeResult);
+      return {
+        success: true,
+        data: claudeResult,
       };
     }
 
