@@ -154,14 +154,21 @@ export default function RecipesPage() {
 
                   <div className="mt-4">
                     <p className="text-sm font-medium text-gray-900">Ingredients</p>
-                    <ul className="mt-2 space-y-1 text-sm font-light text-gray-700">
-                      {recipe.ingredients.slice(0, 5).map((ingredient) => (
-                        <li key={`${recipe.id}-${ingredient}`}>• {ingredient}</li>
-                      ))}
-                      {recipe.ingredients.length > 5 ? (
-                        <li className="text-gray-500">+ {recipe.ingredients.length - 5} more</li>
-                      ) : null}
-                    </ul>
+                    {recipe.ingredient_details && recipe.ingredient_details.length > 0 ? (
+                      <p className="mt-2 text-sm font-light text-gray-700">
+                        You have{' '}
+                        {
+                          recipe.ingredient_details.filter(
+                            (detail) => detail.status === 'owned' || detail.status === 'staple',
+                          ).length
+                        }{' '}
+                        of {recipe.ingredient_details.length}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm font-light text-gray-700">
+                        {recipe.ingredients.length} ingredients
+                      </p>
+                    )}
                   </div>
 
                   <div className="mt-4">
@@ -169,7 +176,13 @@ export default function RecipesPage() {
                     <p className="mt-1 text-sm font-light text-gray-600">{recipe.reasoning}</p>
                   </div>
 
-                  <div className="mt-auto flex flex-wrap gap-2 pt-5">
+                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-5">
+                    <Link
+                      href={`/recipes/${recipe.id}`}
+                      className="rounded-full bg-emerald-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-emerald-800"
+                    >
+                      View recipe
+                    </Link>
                     <button
                       type="button"
                       onClick={() => handleFlagUpdate(recipe.id, { saved: !recipe.saved })}

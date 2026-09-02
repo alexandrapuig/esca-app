@@ -63,6 +63,12 @@ export type SpoilagePrediction = {
   reasoning: string;
 };
 
+export type RecipeIngredientDetail = {
+  text: string;
+  status: 'owned' | 'partial' | 'missing' | 'staple';
+  note?: string;
+};
+
 export type RecipeSuggestion = {
   id: string;
   name: string;
@@ -70,6 +76,7 @@ export type RecipeSuggestion = {
   cuisine: string;
   dietary_tags: string[];
   ingredients: string[];
+  ingredient_details: RecipeIngredientDetail[];
   instructions: string[];
   difficulty: 'easy' | 'medium' | 'hard';
   prep_time_minutes: number;
