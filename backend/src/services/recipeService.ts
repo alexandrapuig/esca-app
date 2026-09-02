@@ -118,12 +118,21 @@ export async function generateRecipesForUser(params: {
       // Every generation previously appended, so unsaved suggestions piled up
       // indefinitely. Clear the household's untouched ones first. Saved or
       // cooked recipes survive.
-      await supabase
+      const { error: dedupeError } = await supabase
         .from('recipe_suggestions')
         .delete()
         .eq('household_id', params.householdId)
         .eq('saved', false)
         .eq('cooked', false);
+
+      // Not fatal: the recipes below are still valid, they will just sit
+      // alongside the stale ones. Logged rather than raised.
+      if (dedupeError) {
+        console.error('recipe dedupe delete failed', {
+          householdId: params.householdId,
+          error: dedupeError,
+        });
+      }
 
       const rows = recipes.map((recipe) => ({
         user_id: params.userId,
@@ -139,7 +148,22 @@ export async function generateRecipesForUser(params: {
         reasoning: recipe.reasoning,
       }));
 
-      await supabase.from('recipe_suggestions').insert(rows);
+      const { error: insertError } = await supabase.from('recipe_suggestions').insert(rows);
+
+      // Fatal: returning these recipes without persisting them shows the user
+      // suggestions that vanish on reload.
+      if (insertError) {
+        console.error('recipe insert failed', {
+          householdId: params.householdId,
+          rowCount: rows.length,
+          error: insertError,
+        });
+        return {
+          success: false,
+          status: 500,
+          error: 'Unable to save recipe suggestions',
+        };
+      }
     }
 
     return {
