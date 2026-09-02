@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { getCurrentUser, signOut } from '@/lib/supabase';
+import { getCurrentUser } from '@/lib/supabase';
 import { getUserStats, type UserStats } from '@/lib/api';
 
 const STAT_CARDS: Array<{
@@ -23,7 +23,6 @@ const STAT_CARDS: Array<{
 export default function DashboardPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [isSigningOut, setIsSigningOut] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [stats, setStats] = useState<UserStats | null>(null);
 
@@ -52,20 +51,6 @@ export default function DashboardPage() {
 
     void loadDashboard();
   }, [router]);
-
-  async function handleSignOut() {
-    setIsSigningOut(true);
-    const result = await signOut();
-
-    if (result.error) {
-      setErrorMessage(result.error.message);
-      setIsSigningOut(false);
-      return;
-    }
-
-    router.push('/auth/login');
-    router.refresh();
-  }
 
   if (isLoading) {
     return (
@@ -137,15 +122,6 @@ export default function DashboardPage() {
             </p>
           </Link>
         </section>
-
-        <button
-          className="inline-flex w-fit rounded-lg border border-gray-300 px-6 py-3 text-sm font-medium text-gray-900 transition hover:border-gray-400 disabled:cursor-not-allowed disabled:opacity-60"
-          type="button"
-          onClick={handleSignOut}
-          disabled={isSigningOut}
-        >
-          {isSigningOut ? 'Signing out...' : 'Log out'}
-        </button>
 
         <p className="pb-8 text-center text-sm font-light text-gray-500">Track what you have. Waste less. Live well.</p>
       </div>
