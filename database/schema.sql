@@ -243,7 +243,9 @@ CREATE TABLE IF NOT EXISTS public.barcode_cache (
   product_name    text NOT NULL,
   category        text NOT NULL,
   shelf_life_days integer,
-  created_at      timestamptz DEFAULT now()
+  created_at      timestamptz DEFAULT now(),
+  brand           text,
+  quantity_text   text
 );
 
 -- NOTE: this table's column is shelf_life_days, NOT typical_shelf_life_days.
