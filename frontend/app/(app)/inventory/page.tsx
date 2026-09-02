@@ -18,6 +18,17 @@ function formatDate(dateValue: string | null): string {
     return '-';
   }
 
+  // purchase_date and estimated_expiry are plain YYYY-MM-DD values with no time
+  // component. new Date('2026-09-02') parses as midnight UTC, which
+  // toLocaleDateString then renders in local time — one day earlier anywhere
+  // west of Greenwich. Build the date from the parts instead.
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
+
+  if (parts) {
+    const [, year, month, day] = parts;
+    return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString();
+  }
+
   return new Date(dateValue).toLocaleDateString();
 }
 
