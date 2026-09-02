@@ -33,6 +33,7 @@ function fallbackRecipes(atRiskItems: AtRiskItem[]): RecipeSuggestionResult[] {
       cuisine: 'other',
       dietary_tags: [],
       ingredients: ingredientNames,
+      ingredient_details: ingredientNames.map((name) => ({ text: name, status: 'owned' })),
       instructions: ['Prep ingredients', 'Saute aromatics', 'Cook ingredients by firmness', 'Season and serve'],
       difficulty: 'easy',
       prep_time_minutes: 20,
@@ -98,6 +99,13 @@ export async function generateRecipesForUser(params: {
       .eq('id', params.userId)
       .single<UserRow>();
 
+    const { data: inventoryRows } = await supabase
+      .from('fridge_items')
+      .select('name, category, quantity, unit')
+      .eq('household_id', params.householdId)
+      .eq('status', 'fresh')
+      .returns<{ name: string; category: string | null; quantity: number | null; unit: string | null }[]>();
+
     let recipes: RecipeSuggestionResult[];
 
     try {
@@ -106,6 +114,12 @@ export async function generateRecipesForUser(params: {
           item_name: item.name,
           category: item.category,
           risk_level: item.risk_level,
+        })),
+        inventory: (inventoryRows ?? []).map((item) => ({
+          item_name: item.name,
+          category: item.category,
+          quantity: item.quantity,
+          unit: item.unit,
         })),
         dietaryRestrictions: userRow?.dietary_restrictions ?? [],
       });
@@ -142,6 +156,7 @@ export async function generateRecipesForUser(params: {
         cuisine: recipe.cuisine,
         dietary_tags: recipe.dietary_tags,
         ingredients: recipe.ingredients,
+        ingredient_details: recipe.ingredient_details,
         instructions: recipe.instructions,
         difficulty: recipe.difficulty,
         prep_time_minutes: recipe.prep_time_minutes,
@@ -191,7 +206,7 @@ export async function listRecipesForUser(params: { householdId: string }): Promi
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from('recipe_suggestions')
-      .select('id, name, description, cuisine, dietary_tags, ingredients, instructions, difficulty, prep_time_minutes, reasoning, saved, cooked, created_at')
+      .select('id, name, description, cuisine, dietary_tags, ingredients, ingredient_details, instructions, difficulty, prep_time_minutes, reasoning, saved, cooked, created_at')
       .eq('household_id', params.householdId)
       .order('created_at', { ascending: false })
       .returns<StoredRecipeSuggestion[]>();
@@ -244,7 +259,7 @@ export async function updateRecipeSuggestionFlags(params: {
       .update(updatePayload)
       .eq('id', params.recipeId)
       .eq('household_id', params.householdId)
-      .select('id, name, description, cuisine, dietary_tags, ingredients, instructions, difficulty, prep_time_minutes, reasoning, saved, cooked, created_at')
+      .select('id, name, description, cuisine, dietary_tags, ingredients, ingredient_details, instructions, difficulty, prep_time_minutes, reasoning, saved, cooked, created_at')
       .single<StoredRecipeSuggestion>();
 
     if (error || !data) {

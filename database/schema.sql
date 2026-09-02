@@ -221,6 +221,7 @@ CREATE TABLE IF NOT EXISTS public.recipe_suggestions (
   saved             boolean DEFAULT false,
   cooked            boolean DEFAULT false,
   variants          jsonb DEFAULT '[]'::jsonb,
+  ingredient_details jsonb DEFAULT '[]'::jsonb,
   description       text,
   reasoning         text,
   created_at        timestamptz DEFAULT now(),
