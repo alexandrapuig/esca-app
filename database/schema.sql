@@ -257,6 +257,33 @@ CREATE TABLE IF NOT EXISTS public.barcode_cache (
 -- uses this exact name before changing anything.
 
 -- ---------------------------------------------------------------------------
+-- events
+-- ---------------------------------------------------------------------------
+--
+-- Product analytics. Writes go through analyticsService.trackEvent, which
+-- allowlists property KEYS - no item names, recipe names, brands, purchase
+-- locations, emails, notes, or dietary restrictions reach this table.
+--
+-- RLS enabled with no policies, same as households: denies anon/authenticated
+-- clients while the service key bypasses as usual.
+
+CREATE TABLE IF NOT EXISTS public.events (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid REFERENCES public.users(id) ON DELETE CASCADE,
+  household_id uuid REFERENCES public.households(id) ON DELETE CASCADE,
+  event_name   text NOT NULL,
+  properties   jsonb DEFAULT '{}'::jsonb,
+  created_at   timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_event_name
+  ON public.events USING btree (event_name);
+CREATE INDEX IF NOT EXISTS idx_events_created_at
+  ON public.events USING btree (created_at);
+
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+
+-- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------
 --
