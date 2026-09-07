@@ -80,6 +80,18 @@ export default function DashboardPage() {
           <div className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{errorMessage}</div>
         ) : null}
 
+        {stats && stats.rescue_rate_percent !== null ? (
+          <section className="rounded-2xl border-2 border-emerald-100 bg-emerald-50 p-8 md:p-10">
+            <p className="text-sm text-gray-600">Rescue rate</p>
+            <p className="mt-2 font-serif text-5xl leading-tight text-emerald-900">
+              {stats.rescue_rate_percent}%
+            </p>
+            <p className="mt-3 text-sm font-light text-gray-600">
+              Of everything you have finished with, this much was eaten rather than thrown out.
+            </p>
+          </section>
+        ) : null}
+
         {stats ? (
           <section className="grid gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-4">
             {STAT_CARDS.map((card) => (

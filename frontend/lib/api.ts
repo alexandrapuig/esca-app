@@ -55,6 +55,7 @@ export type UserStats = {
   waste_prevented_kg: number;
   co2_saved_kg: number;
   money_saved: number;
+  rescue_rate_percent: number | null;
 };
 
 export type SpoilagePrediction = {
