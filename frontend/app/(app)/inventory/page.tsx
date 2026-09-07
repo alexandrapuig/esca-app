@@ -32,6 +32,27 @@ function formatDate(dateValue: string | null): string {
   return new Date(dateValue).toLocaleDateString();
 }
 
+type SortColumn =
+  | 'name'
+  | 'category'
+  | 'purchaseDate'
+  | 'estimatedExpiry'
+  | 'quantity'
+  | 'status'
+  | 'risk';
+
+const SORT_COLUMNS: Array<{ key: SortColumn; label: string }> = [
+  { key: 'name', label: 'Item' },
+  { key: 'category', label: 'Category' },
+  { key: 'purchaseDate', label: 'Purchase date' },
+  { key: 'estimatedExpiry', label: 'Estimated expiry' },
+  { key: 'quantity', label: 'Quantity' },
+  { key: 'status', label: 'Status' },
+  { key: 'risk', label: 'Spoilage risk' },
+];
+
+const RISK_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
 function itemStatusStyles(status: FridgeItem['status']): string {
   if (status === 'consumed') {
     return 'bg-emerald-100 text-emerald-800';
@@ -46,7 +67,8 @@ function itemStatusStyles(status: FridgeItem['status']): string {
 
 export default function InventoryPage() {
   const [items, setItems] = useState<FridgeItem[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'fresh' | 'consumed' | 'expired'>('all');
+  const [sortColumn, setSortColumn] = useState<SortColumn>('estimatedExpiry');
+  const [sortAscending, setSortAscending] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isPredicting, setIsPredicting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -61,7 +83,7 @@ export default function InventoryPage() {
       setIsLoading(true);
       setErrorMessage('');
 
-      const result = await getFridgeItems(statusFilter === 'all' ? undefined : statusFilter);
+      const result = await getFridgeItems();
       const predictionResult = await getLatestPredictions();
 
       if (!result.success) {
@@ -77,9 +99,61 @@ export default function InventoryPage() {
     }
 
     void loadItems();
-  }, [statusFilter]);
+  }, []);
 
   const hasItems = useMemo(() => items.length > 0, [items]);
+
+  function toggleSort(column: SortColumn) {
+    if (column === sortColumn) {
+      setSortAscending((current) => !current);
+      return;
+    }
+
+    setSortColumn(column);
+    setSortAscending(true);
+  }
+
+  // Items with no prediction sort last on risk rather than counting as low,
+  // since "not yet predicted" is not the same as "safe". Nulls sort last on
+  // every column for the same reason.
+  const sortedItems = useMemo(() => {
+    const withRisk = (item: FridgeItem): number => {
+      const prediction = predictions.find((entry) => entry.item_id === item.id);
+      return prediction ? (RISK_ORDER[prediction.risk_level] ?? 3) : 4;
+    };
+
+    const value = (item: FridgeItem): string | number | null => {
+      if (sortColumn === 'risk') {
+        return withRisk(item);
+      }
+
+      if (sortColumn === 'quantity') {
+        return item.quantity;
+      }
+
+      const raw = item[sortColumn];
+      return typeof raw === 'string' ? raw.toLowerCase() : raw;
+    };
+
+    return [...items].sort((first, second) => {
+      const a = value(first);
+      const b = value(second);
+
+      if (a === null || a === '') {
+        return b === null || b === '' ? 0 : 1;
+      }
+
+      if (b === null || b === '') {
+        return -1;
+      }
+
+      if (a === b) {
+        return 0;
+      }
+
+      return (a < b ? -1 : 1) * (sortAscending ? 1 : -1);
+    });
+  }, [items, predictions, sortColumn, sortAscending]);
 
   function getPredictionForItem(itemId: string): SpoilagePrediction | null {
     return predictions.find((prediction) => prediction.item_id === itemId) ?? null;
@@ -200,21 +274,6 @@ export default function InventoryPage() {
 
         <section className="rounded-2xl border border-gray-200 p-6 md:p-8">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-gray-600">Filter status:</span>
-            {(['all', 'fresh', 'consumed', 'expired'] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setStatusFilter(value)}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  statusFilter === value
-                    ? 'bg-emerald-900 text-white'
-                    : 'border border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                }`}
-              >
-                {value[0].toUpperCase() + value.slice(1)}
-              </button>
-            ))}
             <button
               type="button"
               onClick={handleGeneratePredictions}
@@ -251,18 +310,25 @@ export default function InventoryPage() {
                 <table className="min-w-full divide-y divide-stone-200 text-left text-sm">
                   <thead className="bg-stone-100 text-xs uppercase tracking-[0.18em] text-stone-500">
                     <tr>
-                      <th className="px-4 py-3">Item</th>
-                      <th className="px-4 py-3">Category</th>
-                      <th className="px-4 py-3">Purchase date</th>
-                      <th className="px-4 py-3">Estimated expiry</th>
-                      <th className="px-4 py-3">Quantity</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Spoilage risk</th>
+                      {SORT_COLUMNS.map(({ key, label }) => (
+                        <th key={key} className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleSort(key)}
+                            className="inline-flex items-center gap-1 uppercase tracking-[0.18em] transition hover:text-stone-900"
+                          >
+                            {label}
+                            <span className={sortColumn === key ? 'text-stone-900' : 'text-stone-300'}>
+                              {sortColumn === key && !sortAscending ? '\u25b2' : '\u25bc'}
+                            </span>
+                          </button>
+                        </th>
+                      ))}
                       <th className="px-4 py-3">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-200 bg-white">
-                    {items.map((item) => (
+                    {sortedItems.map((item) => (
                       <tr key={item.id} className="align-top">
                         {(() => {
                           const prediction = getPredictionForItem(item.id);
@@ -322,8 +388,33 @@ export default function InventoryPage() {
                 </table>
               </div>
 
-              <div className="mt-6 grid gap-4 md:hidden">
-                {items.map((item) => {
+              <div className="mt-6 flex items-center gap-2 md:hidden">
+                <label className="flex-1">
+                  <span className="sr-only">Sort by</span>
+                  <select
+                    value={sortColumn}
+                    onChange={(event) => setSortColumn(event.target.value as SortColumn)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700"
+                  >
+                    {SORT_COLUMNS.map(({ key, label }) => (
+                      <option key={key} value={key}>
+                        Sort by {label.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setSortAscending((current) => !current)}
+                  aria-label={sortAscending ? 'Sort descending' : 'Sort ascending'}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition hover:border-gray-400"
+                >
+                  {sortAscending ? '\u25bc' : '\u25b2'}
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4 md:hidden">
+                {sortedItems.map((item) => {
                   const prediction = getPredictionForItem(item.id);
 
                   return (
