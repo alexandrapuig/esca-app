@@ -245,7 +245,7 @@ export default function AddInventoryItemPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white px-6 py-10 text-gray-900 md:px-12 md:py-16">
+    <main className="min-h-screen bg-[#f6f1e8] px-6 py-10 text-gray-900 md:px-12 md:py-16">
       <div className="mx-auto w-full max-w-3xl">
         <section className="rounded-2xl border border-gray-200 p-6 md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">

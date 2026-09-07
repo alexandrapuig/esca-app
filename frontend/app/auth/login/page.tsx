@@ -31,7 +31,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-white px-6 py-16 text-gray-900">
+    <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-6 py-16 text-gray-900">
       <section className="grid w-full max-w-5xl overflow-hidden rounded-2xl border border-gray-200 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="relative flex flex-col justify-between bg-[linear-gradient(rgba(6,40,26,0.55),rgba(6,40,26,0.75)),url('https://images.unsplash.com/photo-1464207687429-7505649dae38?w=1200&h=1600&fit=crop')] bg-cover bg-center px-8 py-10 text-white sm:px-12">
           <div>

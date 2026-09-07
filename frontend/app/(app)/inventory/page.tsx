@@ -336,7 +336,7 @@ function InventoryPageContent() {
   }
 
   return (
-    <main className="min-h-screen bg-white px-6 py-10 text-gray-900 md:px-12 md:py-16">
+    <main className="min-h-screen bg-[#f6f1e8] px-6 py-10 text-gray-900 md:px-12 md:py-16">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>

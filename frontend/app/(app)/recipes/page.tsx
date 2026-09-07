@@ -89,7 +89,7 @@ export default function RecipesPage() {
   });
 
   return (
-    <main className="min-h-screen bg-white px-6 py-10 text-gray-900 md:px-12 md:py-16">
+    <main className="min-h-screen bg-[#f6f1e8] px-6 py-10 text-gray-900 md:px-12 md:py-16">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -169,11 +169,7 @@ export default function RecipesPage() {
         {!isLoading && visibleRecipes.length > 0 ? (
           <section className="grid gap-6 md:gap-8">
             {visibleRecipes.map((recipe) => (
-              <article key={recipe.id} className="overflow-hidden rounded-2xl border border-gray-200 transition hover:shadow-lg md:grid md:grid-cols-[320px_1fr]">
-                <div
-                  className="h-64 bg-cover bg-center md:h-full"
-                  style={{ backgroundImage: "url('https://images.unsplash.com/photo-1495511321334-e7b0541e3a00?w=500&h=400&fit=crop')" }}
-                />
+              <article key={recipe.id} className="overflow-hidden rounded-2xl border border-gray-200 transition hover:shadow-lg">
                 <div className="flex flex-col p-6 md:p-8">
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="font-serif text-2xl leading-snug text-gray-900">{recipe.name}</h2>

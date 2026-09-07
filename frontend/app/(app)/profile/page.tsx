@@ -92,7 +92,7 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-white px-6 py-16 text-gray-900">
+      <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-6 py-16 text-gray-900">
         <section className="w-full max-w-xl rounded-2xl border border-gray-200 p-10">
           <div className="h-3 w-24 animate-pulse rounded-full bg-gray-200" />
           <div className="mt-6 h-10 w-3/4 animate-pulse rounded-full bg-gray-100" />
@@ -102,7 +102,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="min-h-screen bg-white px-6 py-10 text-gray-900 md:px-12 md:py-16">
+    <main className="min-h-screen bg-[#f6f1e8] px-6 py-10 text-gray-900 md:px-12 md:py-16">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
         <header>
           <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">Profile</p>

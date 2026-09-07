@@ -102,7 +102,7 @@ export default function RecipeDetailPage() {
 
 	if (isLoading) {
 		return (
-			<main className="min-h-screen bg-white px-6 py-10 text-gray-900 md:px-12 md:py-16">
+			<main className="min-h-screen bg-[#f6f1e8] px-6 py-10 text-gray-900 md:px-12 md:py-16">
 				<div className="mx-auto w-full max-w-3xl">
 					<div className="h-8 w-2/3 animate-pulse rounded-full bg-gray-200" />
 					<div className="mt-6 h-4 w-full animate-pulse rounded-full bg-gray-100" />
@@ -114,7 +114,7 @@ export default function RecipeDetailPage() {
 
 	if (notFound || !recipe) {
 		return (
-			<main className="min-h-screen bg-white px-6 py-10 text-gray-900 md:px-12 md:py-16">
+			<main className="min-h-screen bg-[#f6f1e8] px-6 py-10 text-gray-900 md:px-12 md:py-16">
 				<div className="mx-auto w-full max-w-3xl text-center">
 					<p className="font-serif text-2xl leading-snug">Recipe not found</p>
 					<p className="mt-2 text-sm font-light text-gray-600">
@@ -144,7 +144,7 @@ export default function RecipeDetailPage() {
 	).length;
 
 	return (
-		<main className="min-h-screen bg-white px-6 py-10 text-gray-900 md:px-12 md:py-16">
+		<main className="min-h-screen bg-[#f6f1e8] px-6 py-10 text-gray-900 md:px-12 md:py-16">
 			<div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div>

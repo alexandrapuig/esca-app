@@ -28,7 +28,7 @@ const features = [
 
 export default function Home() {
   return (
-    <div className="bg-white text-gray-900">
+    <div className="bg-[#f6f1e8] text-gray-900">
       <nav className="border-b border-gray-200 px-6" aria-label="Primary navigation">
         <div className="mx-auto flex max-w-7xl items-center justify-between py-5">
           <Link className="font-serif text-2xl text-emerald-900" href="/">Esca</Link>

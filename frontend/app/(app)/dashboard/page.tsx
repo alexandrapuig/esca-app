@@ -66,7 +66,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white px-6 py-10 text-gray-900 md:px-12 md:py-16">
+    <main className="min-h-screen bg-[#f6f1e8] px-6 py-10 text-gray-900 md:px-12 md:py-16">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <header>
           <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">Welcome Back</p>

@@ -17,7 +17,7 @@ const sections = [
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-[#f6f1e8] text-gray-900">
       <main className="mx-auto max-w-4xl px-6 py-16">
         <p className="text-sm font-medium uppercase tracking-wide text-emerald-900">Legal</p>
         <h1 className="mt-3 font-serif text-4xl text-emerald-900 sm:text-5xl">Terms of Service</h1>
