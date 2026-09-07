@@ -31,8 +31,35 @@ function daysUntil(expiry: string | null): number {
   return Math.max(0, Math.ceil((expiryMs - now) / 86400000));
 }
 
-function riskFromDays(days: number): 'low' | 'medium' | 'high' {
-  return days < 3 ? 'high' : days <= 7 ? 'medium' : 'low';
+/**
+ * Days-until-expiry thresholds per category, as [high, medium]. Below the
+ * first number is high risk, below the second is medium, otherwise low.
+ *
+ * A single date rule for everything meant raw chicken and dried pasta were
+ * treated identically at the same day count, which was visible to users:
+ * poultry four days out showed "Medium risk" beside reasoning text calling it
+ * extremely perishable.
+ *
+ * MUST match the copy in the frontend inventory page. The same rule decides
+ * what the inventory page displays and which items land in the recipe at-risk
+ * pool, so changing one without the other makes them disagree.
+ */
+const RISK_THRESHOLDS: Record<string, [number, number]> = {
+  seafood: [2, 4],
+  meat: [3, 5],
+  dairy: [3, 7],
+  produce: [3, 7],
+  bakery: [2, 5],
+  beverage: [5, 14],
+  frozen: [14, 45],
+  pantry: [14, 45],
+  other: [3, 7],
+};
+
+function riskFromDays(days: number, category: string | null): 'low' | 'medium' | 'high' {
+  const [high, medium] = RISK_THRESHOLDS[category ?? 'other'] ?? [3, 7];
+
+  return days < high ? 'high' : days <= medium ? 'medium' : 'low';
 }
 
 function fallbackPrediction(item: FridgeItemForPrediction): SpoilagePrediction {
@@ -40,7 +67,7 @@ function fallbackPrediction(item: FridgeItemForPrediction): SpoilagePrediction {
   const expiryMs = item.estimated_expiry ? new Date(item.estimated_expiry).getTime() : now + 7 * 86400000;
   const days = Math.max(0, Math.ceil((expiryMs - now) / 86400000));
 
-  const riskLevel: 'low' | 'medium' | 'high' = days < 3 ? 'high' : days <= 7 ? 'medium' : 'low';
+  const riskLevel = riskFromDays(days, item.category);
 
   return {
     item_id: item.id,
@@ -111,7 +138,7 @@ export async function generatePredictionsForUser(params: {
 
       return {
         item_id: item.id,
-        risk_level: riskFromDays(days),
+        risk_level: riskFromDays(days, item.category),
         days_until_expiry: days,
         spoilage_probability_percent: modelPrediction.spoilage_probability_percent,
         confidence_score: modelPrediction.confidence_score,

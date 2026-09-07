@@ -83,12 +83,39 @@ function daysUntilExpiry(estimatedExpiry: string | null): number | null {
   return Math.max(0, Math.ceil((expiry.getTime() - today.getTime()) / 86400000));
 }
 
-function riskFromDays(days: number | null): 'low' | 'medium' | 'high' | null {
+/**
+ * Days-until-expiry thresholds per category, as [high, medium]. Below the
+ * first number is high risk, below the second is medium, otherwise low.
+ *
+ * A single date rule for everything meant raw chicken and dried pasta were
+ * treated identically at the same day count, which was visible to users:
+ * poultry four days out showed "Medium risk" beside reasoning text calling it
+ * extremely perishable.
+ *
+ * MUST match the copy in backend predictionService. The same rule decides
+ * what the inventory page displays and which items land in the recipe at-risk
+ * pool, so changing one without the other makes them disagree.
+ */
+const RISK_THRESHOLDS: Record<string, [number, number]> = {
+  seafood: [2, 4],
+  meat: [3, 5],
+  dairy: [3, 7],
+  produce: [3, 7],
+  bakery: [2, 5],
+  beverage: [5, 14],
+  frozen: [14, 45],
+  pantry: [14, 45],
+  other: [3, 7],
+};
+
+function riskFromDays(days: number | null, category: string | null): 'low' | 'medium' | 'high' | null {
   if (days === null) {
     return null;
   }
 
-  return days < 3 ? 'high' : days <= 7 ? 'medium' : 'low';
+  const [high, medium] = RISK_THRESHOLDS[category ?? 'other'] ?? RISK_THRESHOLDS.other;
+
+  return days < high ? 'high' : days <= medium ? 'medium' : 'low';
 }
 
 function itemStatusStyles(status: FridgeItem['status']): string {
@@ -185,7 +212,7 @@ export default function InventoryPage() {
   // every column for the same reason.
   const sortedItems = useMemo(() => {
     const withRisk = (item: FridgeItem): number => {
-      const risk = riskFromDays(daysUntilExpiry(item.estimatedExpiry));
+      const risk = riskFromDays(daysUntilExpiry(item.estimatedExpiry), item.category);
       return risk ? (RISK_ORDER[risk] ?? 3) : 4;
     };
 
@@ -396,7 +423,7 @@ export default function InventoryPage() {
                       <tr key={item.id} className="align-top">
                         {(() => {
                           const prediction = getPredictionForItem(item.id);
-                          const risk = riskFromDays(daysUntilExpiry(item.estimatedExpiry));
+                          const risk = riskFromDays(daysUntilExpiry(item.estimatedExpiry), item.category);
 
                           return (
                             <>
@@ -481,7 +508,7 @@ export default function InventoryPage() {
               <div className="mt-4 grid gap-4 md:hidden">
                 {sortedItems.map((item) => {
                   const prediction = getPredictionForItem(item.id);
-                  const risk = riskFromDays(daysUntilExpiry(item.estimatedExpiry));
+                  const risk = riskFromDays(daysUntilExpiry(item.estimatedExpiry), item.category);
 
                   return (
                     <article key={`${item.id}-card`} className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
