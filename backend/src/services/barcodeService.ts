@@ -120,22 +120,60 @@ async function identifyWithOpenFoodFacts(barcode: string): Promise<BarcodeLookup
       return null;
     }
 
+    // Open Food Facts categories are a free-text taxonomy, so this is keyword
+    // matching rather than a real mapping. Order matters: frozen and seafood
+    // are checked before the broader terms they overlap with. Anything
+    // unmatched falls to 'other', which carries a 14 day shelf life - wrong
+    // for most shelf-stable goods, which is why pantry keywords are broad.
     const categoriesText = (product.categories ?? '').toLowerCase();
-    const category = categoriesText.includes('dairy')
-      ? 'dairy'
-      : categoriesText.includes('meat')
-        ? 'meat'
-        : categoriesText.includes('seafood')
-          ? 'seafood'
-          : categoriesText.includes('frozen')
-            ? 'frozen'
-            : categoriesText.includes('bread') || categoriesText.includes('bakery')
+    const matches = (...terms: string[]): boolean =>
+      terms.some((term) => categoriesText.includes(term));
+
+    const category = matches('frozen', 'ice cream')
+      ? 'frozen'
+      : matches('seafood', 'fish', 'shellfish', 'salmon', 'tuna')
+        ? 'seafood'
+        : matches('meat', 'poultry', 'chicken', 'beef', 'pork', 'charcuterie', 'sausage')
+          ? 'meat'
+          : matches('dairy', 'milk', 'cheese', 'yogurt', 'yoghurt', 'butter', 'cream')
+            ? 'dairy'
+            : matches('bread', 'bakery', 'pastr', 'cake', 'viennoiserie')
               ? 'bakery'
-              : categoriesText.includes('beverage') || categoriesText.includes('drink')
+              : matches('beverage', 'drink', 'juice', 'water', 'soda', 'coffee', 'tea')
                 ? 'beverage'
-                : categoriesText.includes('fruit') || categoriesText.includes('vegetable')
+                : matches('fresh fruit', 'fresh vegetable', 'fresh-fruit', 'fresh-vegetable', 'salad', 'herb')
                   ? 'produce'
-                  : 'other';
+                  : matches(
+                        'snack',
+                        'biscuit',
+                        'cookie',
+                        'cracker',
+                        'cereal',
+                        'pasta',
+                        'rice',
+                        'grain',
+                        'legume',
+                        'canned',
+                        'tinned',
+                        'preserve',
+                        'spread',
+                        'sauce',
+                        'condiment',
+                        'oil',
+                        'vinegar',
+                        'spice',
+                        'seasoning',
+                        'salt',
+                        'sugar',
+                        'flour',
+                        'baking',
+                        'confection',
+                        'chocolate',
+                        'nut',
+                        'dried',
+                      )
+                    ? 'pantry'
+                    : 'other';
 
     // Open Food Facts has no shelf life, so a real product record would
     // otherwise fall back to a flat per-category default - which is how
@@ -190,15 +228,34 @@ export async function learnBarcode(params: {
 
     const { data: existing } = await supabase
       .from('barcode_cache')
-      .select('barcode')
+      .select('barcode, category')
       .eq('barcode', barcode)
-      .maybeSingle<{ barcode: string }>();
-
-    if (existing) {
-      return;
-    }
+      .maybeSingle<{ barcode: string; category: string }>();
 
     const category = normalizeCategory(params.category);
+
+    // Open Food Facts is reliable on product names and unreliable on
+    // categories - its taxonomy rarely maps cleanly onto the nine used here,
+    // so a correct product often lands in 'other' with a 14 day shelf life.
+    // A user correction updates the category only; the name is left alone,
+    // since one person's typing is weaker than a curated record.
+    if (existing) {
+      if (existing.category !== category) {
+        const { error: updateError } = await supabase
+          .from('barcode_cache')
+          .update({
+            category,
+            shelf_life_days: categoryShelfLifeDefaults[category] ?? 14,
+          })
+          .eq('barcode', barcode);
+
+        if (updateError) {
+          console.error('learnBarcode category update failed', { barcode, error: updateError });
+        }
+      }
+
+      return;
+    }
     const shelfLife =
       typeof params.typicalShelfLifeDays === 'number' && Number.isFinite(params.typicalShelfLifeDays)
         ? Math.max(1, Math.floor(params.typicalShelfLifeDays))
