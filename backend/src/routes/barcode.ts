@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { identifyBarcode } from '../services/barcodeService';
 import { requireAuth } from '../utils/auth';
+import { trackEvent } from '../services/analyticsService';
 
 type BarcodeIdentifyBody = {
   barcode?: string;
@@ -35,6 +36,16 @@ router.post('/identify', async (req, res) => {
   }
 
   const result = await identifyBarcode(identifyInput);
+
+  // The scanner is the newest and least proven path in the app. Tracking
+  // whether a scan resolves at all is the point here.
+  void trackEvent({
+    eventName: 'barcode_identified',
+    properties: {
+      success: result.success,
+      category: result.success ? result.data.category : null,
+    },
+  });
 
   if (!result.success) {
     res.status(result.status).json({

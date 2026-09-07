@@ -2,6 +2,7 @@ import { Router, type Request } from 'express';
 
 import { generatePredictionsForUser, getLatestPredictionsForUser } from '../services/predictionService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
+import { trackEvent } from '../services/analyticsService';
 
 const router = Router();
 
@@ -17,6 +18,16 @@ router.post('/generate', async (req, res) => {
   const result = await generatePredictionsForUser({
     userId: request.user.id,
     householdId: request.user.householdId,
+  });
+
+  void trackEvent({
+    eventName: 'predictions_generated',
+    userId: request.user.id,
+    householdId: request.user.householdId,
+    properties: {
+      success: result.success,
+      count: result.success ? result.data.length : 0,
+    },
   });
 
   if (!result.success) {

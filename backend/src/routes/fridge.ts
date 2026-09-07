@@ -7,6 +7,7 @@ import {
   updateFridgeItem,
 } from '../services/fridgeService';
 import { learnBarcode } from '../services/barcodeService';
+import { trackEvent } from '../services/analyticsService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
 
 type CreateFridgeItemBody = {
@@ -133,6 +134,16 @@ router.post('/items', async (req, res) => {
     });
     return;
   }
+
+  void trackEvent({
+    eventName: 'item_added',
+    userId: request.user.id,
+    householdId: request.user.householdId,
+    properties: {
+      category: result.data.category,
+      via: body.barcode ? 'scan' : 'manual',
+    },
+  });
 
   // Learn the barcode from what the user actually entered, so the next person
   // to scan it gets a real answer. Awaited but never fatal - the item is
@@ -269,6 +280,17 @@ router.put('/items/:id', async (req, res) => {
     });
     return;
   }
+
+  void trackEvent({
+    eventName: 'item_updated',
+    userId: request.user.id,
+    householdId: request.user.householdId,
+    properties: {
+      category: result.data.category,
+      status: result.data.status,
+      had_barcode: Boolean(result.data.barcode),
+    },
+  });
 
   // Correcting an item is the most natural moment to fix a wrong category, so
   // edits teach the cache too - not just creation. Keyed on the barcode stored

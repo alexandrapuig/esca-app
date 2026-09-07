@@ -2,6 +2,7 @@ import { Router, type Request } from 'express';
 
 import { generateRecipesForUser, listRecipesForUser, updateRecipeSuggestionFlags } from '../services/recipeService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
+import { trackEvent } from '../services/analyticsService';
 
 type UpdateRecipeBody = {
   saved?: boolean;
@@ -22,6 +23,18 @@ router.post('/generate', async (req, res) => {
   const result = await generateRecipesForUser({
     userId: request.user.id,
     householdId: request.user.householdId,
+  });
+
+  // A zero count means the at-risk pool was empty - worth distinguishing from
+  // a generation that failed, since they look the same to the user.
+  void trackEvent({
+    eventName: 'recipes_generated',
+    userId: request.user.id,
+    householdId: request.user.householdId,
+    properties: {
+      success: result.success,
+      count: result.success ? result.data.length : 0,
+    },
   });
 
   if (!result.success) {
@@ -91,6 +104,18 @@ router.put('/:id', async (req, res) => {
   }
 
   const result = await updateRecipeSuggestionFlags(updateInput);
+
+  if (result.success) {
+    void trackEvent({
+      eventName: typeof body.saved === 'boolean' ? 'recipe_saved' : 'recipe_cooked',
+      userId: request.user.id,
+      householdId: request.user.householdId,
+      properties: {
+        cuisine: result.data.cuisine,
+        difficulty: result.data.difficulty,
+      },
+    });
+  }
 
   if (!result.success) {
     res.status(result.status).json({
