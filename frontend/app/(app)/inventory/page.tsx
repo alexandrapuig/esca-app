@@ -53,6 +53,44 @@ const SORT_COLUMNS: Array<{ key: SortColumn; label: string }> = [
 
 const RISK_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
+/**
+ * Days until expiry and risk level are recomputed here on every load rather
+ * than read from the stored prediction, because a prediction is a snapshot
+ * from generation time and the day count moves every midnight. Claude's
+ * reasoning text is still taken from the stored row - only the arithmetic is
+ * redone.
+ *
+ * These thresholds MUST match riskFromDays in backend predictionService: the
+ * same rule decides which items land in the recipe at-risk pool. Changing one
+ * without the other makes the two disagree about what is medium risk.
+ */
+function daysUntilExpiry(estimatedExpiry: string | null): number | null {
+  if (!estimatedExpiry) {
+    return null;
+  }
+
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(estimatedExpiry);
+
+  if (!parts) {
+    return null;
+  }
+
+  const [, year, month, day] = parts;
+  const expiry = new Date(Number(year), Number(month) - 1, Number(day));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Math.max(0, Math.ceil((expiry.getTime() - today.getTime()) / 86400000));
+}
+
+function riskFromDays(days: number | null): 'low' | 'medium' | 'high' | null {
+  if (days === null) {
+    return null;
+  }
+
+  return days < 3 ? 'high' : days <= 7 ? 'medium' : 'low';
+}
+
 function itemStatusStyles(status: FridgeItem['status']): string {
   if (status === 'consumed') {
     return 'bg-emerald-100 text-emerald-800';
@@ -118,8 +156,8 @@ export default function InventoryPage() {
   // every column for the same reason.
   const sortedItems = useMemo(() => {
     const withRisk = (item: FridgeItem): number => {
-      const prediction = predictions.find((entry) => entry.item_id === item.id);
-      return prediction ? (RISK_ORDER[prediction.risk_level] ?? 3) : 4;
+      const risk = riskFromDays(daysUntilExpiry(item.estimatedExpiry));
+      return risk ? (RISK_ORDER[risk] ?? 3) : 4;
     };
 
     const value = (item: FridgeItem): string | number | null => {
@@ -162,36 +200,36 @@ export default function InventoryPage() {
   // risk_level is computed by the backend from estimated_expiry. Deriving it
   // again here would mean two copies of the same rule, and any change to the
   // backend thresholds would silently not apply.
-  function getRiskBadgeStyles(prediction: SpoilagePrediction | null): string {
-    if (!prediction) {
-      return 'bg-stone-100 text-stone-700';
-    }
-
-    if (prediction.risk_level === 'high') {
+  function getRiskBadgeStyles(risk: 'low' | 'medium' | 'high' | null): string {
+    if (risk === 'high') {
       return 'bg-red-100 text-red-800';
     }
 
-    if (prediction.risk_level === 'medium') {
+    if (risk === 'medium') {
       return 'bg-amber-100 text-amber-900';
     }
 
-    return 'bg-emerald-100 text-emerald-800';
-  }
-
-  function getRiskLabel(prediction: SpoilagePrediction | null): string {
-    if (!prediction) {
-      return 'No prediction';
+    if (risk === 'low') {
+      return 'bg-emerald-100 text-emerald-800';
     }
 
-    if (prediction.risk_level === 'high') {
+    return 'bg-stone-100 text-stone-700';
+  }
+
+  function getRiskLabel(risk: 'low' | 'medium' | 'high' | null): string {
+    if (risk === 'high') {
       return 'High risk';
     }
 
-    if (prediction.risk_level === 'medium') {
+    if (risk === 'medium') {
       return 'Medium risk';
     }
 
-    return 'Low risk';
+    if (risk === 'low') {
+      return 'Low risk';
+    }
+
+    return 'No expiry date';
   }
 
   async function handleGeneratePredictions() {
@@ -332,6 +370,7 @@ export default function InventoryPage() {
                       <tr key={item.id} className="align-top">
                         {(() => {
                           const prediction = getPredictionForItem(item.id);
+                          const risk = riskFromDays(daysUntilExpiry(item.estimatedExpiry));
 
                           return (
                             <>
@@ -348,10 +387,10 @@ export default function InventoryPage() {
                           </span>
                         </td>
                         <td className="px-4 py-4 text-xs text-stone-700">
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getRiskBadgeStyles(prediction)}`}>
-                            {getRiskLabel(prediction)}
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getRiskBadgeStyles(risk)}`}>
+                            {getRiskLabel(risk)}
                           </span>
-                          <p className="mt-2">Days until expiry: {prediction ? prediction.days_until_expiry : '-'}</p>
+                          <p className="mt-2">Days until expiry: {daysUntilExpiry(item.estimatedExpiry) ?? '-'}</p>
                           <p>Confidence: {prediction ? `${Math.round(prediction.confidence_score * 100)}%` : '-'}</p>
                           <p className="mt-1 max-w-[20rem] text-stone-600">{prediction?.reasoning ?? 'Generate predictions to view reasoning.'}</p>
                         </td>
@@ -416,6 +455,7 @@ export default function InventoryPage() {
               <div className="mt-4 grid gap-4 md:hidden">
                 {sortedItems.map((item) => {
                   const prediction = getPredictionForItem(item.id);
+                  const risk = riskFromDays(daysUntilExpiry(item.estimatedExpiry));
 
                   return (
                     <article key={`${item.id}-card`} className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
@@ -425,13 +465,13 @@ export default function InventoryPage() {
                         {item.status}
                       </span>
                     </div>
-                    <div className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getRiskBadgeStyles(prediction)}`}>
-                      {getRiskLabel(prediction)}
+                    <div className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getRiskBadgeStyles(risk)}`}>
+                      {getRiskLabel(risk)}
                     </div>
                     <p className="mt-2 text-sm text-stone-600">{item.category ?? 'other'}</p>
                     <p className="mt-2 text-sm text-stone-600">Purchased: {formatDate(item.purchaseDate)}</p>
                     <p className="mt-1 text-sm text-stone-600">Expiry: {formatDate(item.estimatedExpiry)}</p>
-                    <p className="mt-1 text-sm text-stone-600">Days until expiry: {prediction ? prediction.days_until_expiry : '-'}</p>
+                    <p className="mt-1 text-sm text-stone-600">Days until expiry: {daysUntilExpiry(item.estimatedExpiry) ?? '-'}</p>
                     <p className="mt-1 text-sm text-stone-600">
                       Confidence: {prediction ? `${Math.round(prediction.confidence_score * 100)}%` : '-'}
                     </p>
