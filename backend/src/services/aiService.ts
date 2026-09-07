@@ -265,6 +265,12 @@ export async function generateRecipesWithClaude(params: {
     quantity: number | null;
     unit: string | null;
   }[];
+  history: {
+    name: string;
+    cuisine: string;
+    difficulty: string;
+    cooked: boolean;
+  }[];
   dietaryRestrictions: string[];
 }): Promise<RecipeSuggestionResult[]> {
   const output = await callClaude(
@@ -282,6 +288,8 @@ Rules for status:
   staple  - a basic item most kitchens have and this app does not track: salt, pepper, cooking oil, water, common dried spices
 
 Prefer recipes where most ingredients are owned. Do not mark something missing if a reasonable match exists in the inventory under a different wording.
+
+The user's previously kept recipes are supplied as history. Recipes marked cooked are a stronger signal than saved ones - saving means it looked appealing, cooking means they actually made it. Use history as a hint about cuisine, difficulty and style, NOT as a constraint: do not suggest a dish that is already in the history, and do not narrow to only what they have picked before. What is expiring matters more than what they usually cook. If history is empty, ignore this entirely.
 
 dietary_tags MUST only contain values from this exact list, and only where the recipe genuinely qualifies: ${DIETARY_OPTIONS.join(', ')}. Return an empty array if none apply. Do not invent other tags.`,
     [

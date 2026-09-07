@@ -106,6 +106,18 @@ export async function generateRecipesForUser(params: {
       .eq('status', 'fresh')
       .returns<{ name: string; category: string | null; quantity: number | null; unit: string | null }[]>();
 
+    // What the household kept from previous generations. Cooked is the
+    // stronger signal; both are sent and labelled. Capped at 20 so a long
+    // history does not crowd out the inventory in the prompt.
+    const { data: historyRows } = await supabase
+      .from('recipe_suggestions')
+      .select('name, cuisine, difficulty, saved, cooked')
+      .eq('household_id', params.householdId)
+      .or('saved.eq.true,cooked.eq.true')
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .returns<{ name: string; cuisine: string; difficulty: string; saved: boolean; cooked: boolean }[]>();
+
     let recipes: RecipeSuggestionResult[];
 
     try {
@@ -120,6 +132,12 @@ export async function generateRecipesForUser(params: {
           category: item.category,
           quantity: item.quantity,
           unit: item.unit,
+        })),
+        history: (historyRows ?? []).map((row) => ({
+          name: row.name,
+          cuisine: row.cuisine,
+          difficulty: row.difficulty,
+          cooked: row.cooked,
         })),
         dietaryRestrictions: userRow?.dietary_restrictions ?? [],
       });
