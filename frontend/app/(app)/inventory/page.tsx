@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 
 import {
   deleteFridgeItem,
@@ -130,7 +131,7 @@ function itemStatusStyles(status: FridgeItem['status']): string {
   return 'bg-amber-100 text-amber-800';
 }
 
-export default function InventoryPage() {
+function InventoryPageContent() {
   const [items, setItems] = useState<FridgeItem[]>([]);
   const [sortColumn, setSortColumn] = useState<SortColumn>('estimatedExpiry');
   const [sortAscending, setSortAscending] = useState(true);
@@ -138,10 +139,19 @@ export default function InventoryPage() {
   const [isPredicting, setIsPredicting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [predictions, setPredictions] = useState<SpoilagePrediction[]>([]);
+  // Reading window.location during render made the server output (no banner)
+  // disagree with the client's (banner), which is what caused the hydration
+  // warning on this page. useSearchParams is the supported way to read query
+  // params, and it requires the component to sit under a Suspense boundary -
+  // see the default export at the bottom of this file.
+  const searchParams = useSearchParams();
+  const success = searchParams.get('success');
   const flashMessage =
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('success') === 'added'
+    success === 'added'
       ? 'Item added to your fridge inventory.'
-      : '';
+      : success === 'updated'
+        ? 'Item updated.'
+        : '';
 
   useEffect(() => {
     async function loadItems() {
@@ -563,5 +573,13 @@ export default function InventoryPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function InventoryPage() {
+  return (
+    <Suspense fallback={null}>
+      <InventoryPageContent />
+    </Suspense>
   );
 }

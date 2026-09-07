@@ -79,7 +79,7 @@ router.put('/profile', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
   const request = getAuthenticatedRequest(req);
-  const result = await getUserStats(request.user.id);
+  const result = await getUserStats(request.user.householdId);
 
   if (!result.success) {
     res.status(result.status).json({

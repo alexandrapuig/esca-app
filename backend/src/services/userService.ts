@@ -29,7 +29,77 @@ export type UserStats = {
   waste_prevented_kg: number;
   co2_saved_kg: number;
   money_saved: number;
+  rescue_rate_percent: number | null;
 };
+
+/**
+ * Average package weight in kg per category, used when an item has no usable
+ * quantity of its own. Replaces a flat 0.15 kg for everything, which treated a
+ * bag of salad and a litre of milk identically.
+ *
+ * These are estimates of typical retail package sizes, not measurements.
+ */
+const CATEGORY_WEIGHTS_KG: Record<string, number> = {
+  produce: 0.3,
+  dairy: 0.5,
+  meat: 0.45,
+  seafood: 0.3,
+  bakery: 0.35,
+  frozen: 0.4,
+  pantry: 0.45,
+  beverage: 1.0,
+  other: 0.3,
+};
+
+/** Fallback spend per item when no purchase price was recorded. */
+const ESTIMATED_ITEM_PRICE = 2.5;
+
+/** kg CO2e per kg of food waste avoided. Rough figure for mixed food waste. */
+const CO2_PER_KG = 2.5;
+
+/**
+ * An item's weight in kg, preferring what the user actually recorded.
+ *
+ * Units are free text, so only the unambiguous mass ones are trusted. Anything
+ * else - "pieces", "cans", an empty unit - falls back to the category average,
+ * because 2 of something says nothing about its weight.
+ */
+function itemWeightKg(item: { category: string | null; quantity: number | null; unit: string | null }): number {
+  const fallback = CATEGORY_WEIGHTS_KG[item.category ?? 'other'] ?? 0.3;
+
+  if (typeof item.quantity !== 'number' || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+    return fallback;
+  }
+
+  const unit = (item.unit ?? '').trim().toLowerCase();
+
+  if (unit === 'g' || unit === 'gram' || unit === 'grams') {
+    return item.quantity / 1000;
+  }
+
+  if (unit === 'kg' || unit === 'kilogram' || unit === 'kilograms') {
+    return item.quantity;
+  }
+
+  // Water-equivalent for liquids. Close enough for milk and juice.
+  if (unit === 'ml' || unit === 'millilitre' || unit === 'millilitres') {
+    return item.quantity / 1000;
+  }
+
+  if (unit === 'l' || unit === 'litre' || unit === 'litres' || unit === 'liter' || unit === 'liters') {
+    return item.quantity;
+  }
+
+  if (unit === 'oz' || unit === 'ounce' || unit === 'ounces') {
+    return (item.quantity * 28.35) / 1000;
+  }
+
+  if (unit === 'lb' || unit === 'lbs' || unit === 'pound' || unit === 'pounds') {
+    return item.quantity * 0.4536;
+  }
+
+  return fallback;
+}
 
 type ServiceSuccess<T> = {
   success: true;
@@ -167,7 +237,7 @@ export async function acceptTerms(userId: string, version: string): Promise<Serv
   return { success: true, data: mapUserProfile(data) };
 }
 
-export async function getUserStats(userId: string): Promise<ServiceResult<UserStats>> {
+export async function getUserStats(householdId: string): Promise<ServiceResult<UserStats>> {
   let supabase: SupabaseClient;
 
   try {
@@ -177,31 +247,55 @@ export async function getUserStats(userId: string): Promise<ServiceResult<UserSt
     return { success: false, status: 500, error: message };
   }
 
+  // Scoped to the household, not the user. This read was missed when everything
+  // else moved to household_id: with one member per household the two are the
+  // same rows, but once invites ship the dashboard would show only your own
+  // items while the inventory showed everyone's.
   const { data, error } = await supabase
     .from('fridge_items')
-    .select('status')
-    .eq('user_id', userId)
-    .returns<{ status: string }[]>();
+    .select('status, category, quantity, unit, purchase_price')
+    .eq('household_id', householdId)
+    .returns<{
+      status: string;
+      category: string | null;
+      quantity: number | null;
+      unit: string | null;
+      purchase_price: number | null;
+    }[]>();
 
   if (error || !data) {
-    console.error('getUserStats failed', { userId, error });
+    console.error('getUserStats failed', { householdId, error });
     return { success: false, status: 500, error: 'Unable to fetch stats' };
   }
 
-  const itemsConsumedCount = data.filter((item) => item.status === 'consumed').length;
+  const consumed = data.filter((item) => item.status === 'consumed');
+  const expiredCount = data.filter((item) => item.status === 'expired').length;
 
-  // Rough per-item estimates until real cost/weight tracking exists.
-  const wastePreventedKg = Math.round(itemsConsumedCount * 0.15 * 100) / 100;
-  const co2SavedKg = Math.round(wastePreventedKg * 2.5 * 100) / 100;
-  const moneySaved = Math.round(itemsConsumedCount * 2.5 * 100) / 100;
+  const wastePreventedKg = consumed.reduce((total, item) => total + itemWeightKg(item), 0);
+
+  const moneySaved = consumed.reduce((total, item) => {
+    const price =
+      typeof item.purchase_price === 'number' && Number.isFinite(item.purchase_price) && item.purchase_price >= 0
+        ? item.purchase_price
+        : ESTIMATED_ITEM_PRICE;
+
+    return total + price;
+  }, 0);
+
+  // Fresh items are still undecided, so only settled ones count. Null until
+  // something has actually been consumed or expired - 0% would read as failure
+  // when it really means "nothing has happened yet".
+  const settled = consumed.length + expiredCount;
+  const rescueRatePercent = settled > 0 ? Math.round((consumed.length / settled) * 100) : null;
 
   return {
     success: true,
     data: {
-      items_consumed_count: itemsConsumedCount,
-      waste_prevented_kg: wastePreventedKg,
-      co2_saved_kg: co2SavedKg,
-      money_saved: moneySaved,
+      items_consumed_count: consumed.length,
+      waste_prevented_kg: Math.round(wastePreventedKg * 100) / 100,
+      co2_saved_kg: Math.round(wastePreventedKg * CO2_PER_KG * 100) / 100,
+      money_saved: Math.round(moneySaved * 100) / 100,
+      rescue_rate_percent: rescueRatePercent,
     },
   };
 }
