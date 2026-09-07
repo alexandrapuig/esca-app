@@ -141,6 +141,7 @@ export async function createFridgeItem(params: {
   notes?: string;
   purchaseDate?: string;
   barcode?: string;
+  estimatedExpiry?: string;
 }): Promise<ServiceResult<FridgeItem>> {
   let supabase: SupabaseClient;
 
@@ -184,7 +185,12 @@ export async function createFridgeItem(params: {
     unit: params.unit?.trim() || null,
     typical_shelf_life_days: shelfLifeDays,
     purchase_date: purchaseDate.toISOString().slice(0, 10),
-    estimated_expiry: estimatedExpiry.toISOString().slice(0, 10),
+    // The add form computes and shows an expiry before saving, and the user
+    // can override it. Prefer what they actually saw over recomputing.
+    estimated_expiry:
+      params.estimatedExpiry && /^\d{4}-\d{2}-\d{2}$/.test(params.estimatedExpiry)
+        ? params.estimatedExpiry
+        : estimatedExpiry.toISOString().slice(0, 10),
     status: 'fresh',
     brand: params.brand?.trim() || null,
     purchase_location: params.purchaseLocation?.trim() || null,

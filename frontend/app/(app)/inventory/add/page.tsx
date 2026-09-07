@@ -43,6 +43,10 @@ export default function AddInventoryItemPage() {
   const [purchasePrice, setPurchasePrice] = useState('');
   const [notes, setNotes] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [estimatedExpiry, setEstimatedExpiry] = useState('');
+  // Once the user types their own date, the computed value stops overwriting
+  // it. Same rule as the other scan-filled fields.
+  const [expiryEdited, setExpiryEdited] = useState(false);
   const [showMoreDetails, setShowMoreDetails] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,6 +63,33 @@ export default function AddInventoryItemPage() {
       }
     };
   }, []);
+
+  // Show the expiry the item will get, before saving rather than after. The
+  // date is sent explicitly, so the backend stores what the user actually saw
+  // instead of recomputing it.
+  useEffect(() => {
+    if (expiryEdited || !purchaseDate) {
+      return;
+    }
+
+    const shelfLifeDays = identified?.typical_shelf_life_days;
+
+    if (!shelfLifeDays) {
+      return;
+    }
+
+    const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(purchaseDate);
+
+    if (!parts) {
+      return;
+    }
+
+    const [, year, month, day] = parts;
+    const computed = new Date(Number(year), Number(month) - 1, Number(day));
+    computed.setDate(computed.getDate() + shelfLifeDays);
+
+    setEstimatedExpiry(computed.toLocaleDateString('en-CA'));
+  }, [purchaseDate, identified, expiryEdited]);
 
   async function startScanning() {
     setErrorMessage('');
@@ -196,6 +227,7 @@ export default function AddInventoryItemPage() {
       purchase_price: parsedPrice,
       notes: notes.trim() || undefined,
       purchase_date: purchaseDate || undefined,
+      estimated_expiry: estimatedExpiry || undefined,
       // Sent so the backend can learn this barcode from what the user typed.
       // scanValue is only set by a successful scan, so manual entries send
       // nothing and nothing is learned from them.
@@ -302,6 +334,11 @@ export default function AddInventoryItemPage() {
                     <label className="block">
                       <span className="mb-3 block text-sm font-medium text-gray-900">Purchase date</span>
                       <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-3 block text-sm font-medium text-gray-900">Estimated expiry</span>
+                      <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="date" value={estimatedExpiry} onChange={(event) => { setEstimatedExpiry(event.target.value); setExpiryEdited(true); }} />
                     </label>
 
                     <label className="block">

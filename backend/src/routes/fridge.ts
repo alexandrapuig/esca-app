@@ -21,6 +21,7 @@ type CreateFridgeItemBody = {
   notes?: string;
   purchase_date?: string;
   barcode?: string;
+  estimated_expiry?: string;
 };
 
 type UpdateFridgeItemBody = {
@@ -72,6 +73,7 @@ router.post('/items', async (req, res) => {
     notes?: string;
     purchaseDate?: string;
     barcode?: string;
+    estimatedExpiry?: string;
   } = {
     userId: request.user.id,
     householdId: request.user.householdId,
@@ -116,6 +118,10 @@ router.post('/items', async (req, res) => {
 
   if (typeof body.barcode === 'string' && body.barcode.trim()) {
     createInput.barcode = body.barcode;
+  }
+
+  if (typeof body.estimated_expiry === 'string' && body.estimated_expiry.trim()) {
+    createInput.estimatedExpiry = body.estimated_expiry;
   }
 
   const result = await createFridgeItem(createInput);
