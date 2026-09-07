@@ -196,6 +196,10 @@ export default function AddInventoryItemPage() {
       purchase_price: parsedPrice,
       notes: notes.trim() || undefined,
       purchase_date: purchaseDate || undefined,
+      // Sent so the backend can learn this barcode from what the user typed.
+      // scanValue is only set by a successful scan, so manual entries send
+      // nothing and nothing is learned from them.
+      barcode: scanValue || undefined,
     });
 
     if (!result.success) {

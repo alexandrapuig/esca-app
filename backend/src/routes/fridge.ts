@@ -6,6 +6,7 @@ import {
   listFridgeItems,
   updateFridgeItem,
 } from '../services/fridgeService';
+import { learnBarcode } from '../services/barcodeService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
 
 type CreateFridgeItemBody = {
@@ -19,6 +20,7 @@ type CreateFridgeItemBody = {
   purchase_price?: number;
   notes?: string;
   purchase_date?: string;
+  barcode?: string;
 };
 
 type UpdateFridgeItemBody = {
@@ -119,6 +121,22 @@ router.post('/items', async (req, res) => {
       error: result.error,
     });
     return;
+  }
+
+  // Learn the barcode from what the user actually entered, so the next person
+  // to scan it gets a real answer. Awaited but never fatal - the item is
+  // already created and learnBarcode swallows its own failures.
+  if (typeof body.barcode === 'string' && body.barcode.trim()) {
+    await learnBarcode({
+      barcode: body.barcode,
+      name: result.data.name,
+      category: result.data.category ?? 'other',
+      quantityText: result.data.quantity
+        ? `${result.data.quantity}${result.data.unit ? ` ${result.data.unit}` : ''}`
+        : null,
+      brand: result.data.brand,
+      typicalShelfLifeDays: result.data.typicalShelfLifeDays,
+    });
   }
 
   res.status(201).json({

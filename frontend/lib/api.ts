@@ -157,6 +157,7 @@ export async function addFridgeItem(input: {
   purchase_price?: number;
   notes?: string;
   purchase_date?: string;
+  barcode?: string;
 }): Promise<ApiResult<FridgeItem>> {
   return apiRequest<FridgeItem>('/api/fridge/items', {
     method: 'POST',

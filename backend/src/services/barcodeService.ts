@@ -155,6 +155,73 @@ async function identifyWithOpenFoodFacts(barcode: string): Promise<BarcodeLookup
   }
 }
 
+/**
+ * Records what a user actually called a product they scanned, so the next
+ * person to scan the same barcode gets a real answer instead of a failed
+ * lookup.
+ *
+ * Only fills gaps: an existing Open Food Facts row is never overwritten by a
+ * user entry, because one person's typing is weaker evidence than a curated
+ * record. Two users disagreeing means the first one wins - acceptable at
+ * current scale, and the source column makes bad rows findable later.
+ *
+ * Deliberately stores only product facts. Purchase location, price, notes and
+ * purchase date are personal and never cached.
+ *
+ * Failures are logged and swallowed: this runs after an item has already been
+ * created, and a cache miss next time is not worth failing that request over.
+ */
+export async function learnBarcode(params: {
+  barcode: string;
+  name: string;
+  category: string;
+  quantityText?: string | null;
+  brand?: string | null;
+  typicalShelfLifeDays?: number | null;
+}): Promise<void> {
+  const barcode = params.barcode.trim();
+
+  if (!barcode || !params.name.trim()) {
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+
+    const { data: existing } = await supabase
+      .from('barcode_cache')
+      .select('barcode')
+      .eq('barcode', barcode)
+      .maybeSingle<{ barcode: string }>();
+
+    if (existing) {
+      return;
+    }
+
+    const category = normalizeCategory(params.category);
+    const shelfLife =
+      typeof params.typicalShelfLifeDays === 'number' && Number.isFinite(params.typicalShelfLifeDays)
+        ? Math.max(1, Math.floor(params.typicalShelfLifeDays))
+        : (categoryShelfLifeDefaults[category] ?? 14);
+
+    const { error } = await supabase.from('barcode_cache').insert({
+      barcode,
+      product_name: params.name.trim(),
+      category,
+      shelf_life_days: shelfLife,
+      brand: params.brand?.trim() || null,
+      quantity_text: params.quantityText?.trim() || null,
+      source: 'user',
+    });
+
+    if (error) {
+      console.error('learnBarcode insert failed', { barcode, error });
+    }
+  } catch (error) {
+    console.error('learnBarcode failed', { barcode, error });
+  }
+}
+
 export async function identifyBarcode(params: {
   barcode: string;
   barcodeImage?: string;
