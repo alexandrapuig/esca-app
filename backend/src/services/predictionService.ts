@@ -8,6 +8,7 @@ export type SpoilagePrediction = {
   spoilage_probability_percent: number;
   confidence_score: number;
   reasoning: string;
+  created_at?: string;
 };
 
 type SpoilagePredictionRow = Omit<SpoilagePrediction, 'item_id'> & {
@@ -172,7 +173,7 @@ export async function getLatestPredictionsForUser(params: { householdId: string 
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from('latest_spoilage_predictions')
-      .select('fridge_item_id, risk_level, days_until_expiry, spoilage_probability_percent, confidence_score, reasoning')
+      .select('fridge_item_id, risk_level, days_until_expiry, spoilage_probability_percent, confidence_score, reasoning, created_at')
       .eq('household_id', params.householdId)
       .returns<SpoilagePredictionRow[]>();
 

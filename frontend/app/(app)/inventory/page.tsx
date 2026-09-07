@@ -132,8 +132,37 @@ export default function InventoryPage() {
       }
 
       setItems(result.data);
-      setPredictions(predictionResult.success ? predictionResult.data : []);
+
+      const existing = predictionResult.success ? predictionResult.data : [];
+      setPredictions(existing);
       setIsLoading(false);
+
+      // The day count and risk badge are recomputed on every load, but Claude's
+      // reasoning text is whatever was last generated - so an item can show
+      // "expires in 4 days" prose next to a count of 0. Regenerate once a day
+      // rather than on every page load: a generation is a Claude call plus a
+      // row per item, and spoilage_predictions is never pruned.
+      if (result.data.length === 0) {
+        return;
+      }
+
+      const newest = existing
+        .map((prediction) => prediction.created_at)
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1);
+
+      const isStale = !newest || Date.now() - new Date(newest).getTime() > 86400000;
+
+      if (!isStale) {
+        return;
+      }
+
+      const refreshed = await generatePredictions();
+
+      if (refreshed.success) {
+        setPredictions(refreshed.data);
+      }
     }
 
     void loadItems();
@@ -197,9 +226,6 @@ export default function InventoryPage() {
     return predictions.find((prediction) => prediction.item_id === itemId) ?? null;
   }
 
-  // risk_level is computed by the backend from estimated_expiry. Deriving it
-  // again here would mean two copies of the same rule, and any change to the
-  // backend thresholds would silently not apply.
   function getRiskBadgeStyles(risk: 'low' | 'medium' | 'high' | null): string {
     if (risk === 'high') {
       return 'bg-red-100 text-red-800';

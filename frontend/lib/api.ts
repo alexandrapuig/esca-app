@@ -64,6 +64,7 @@ export type SpoilagePrediction = {
   spoilage_probability_percent: number;
   confidence_score: number;
   reasoning: string;
+  created_at?: string;
 };
 
 export type RecipeIngredientDetail = {
