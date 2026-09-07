@@ -71,7 +71,7 @@ export default function DashboardPage() {
         <header>
           <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">Welcome Back</p>
           <h1 className="mt-4 font-serif text-5xl leading-tight">Your Food, Your Impact</h1>
-          <p className="mt-4 max-w-2xl text-lg font-light leading-relaxed text-gray-600">
+          <p className="mt-4 max-w-3xl text-lg font-light leading-relaxed text-gray-600">
             Track your inventory, reduce waste, and discover recipes that celebrate what you have.
           </p>
         </header>
@@ -109,7 +109,7 @@ export default function DashboardPage() {
         <section className="grid gap-6 md:gap-8 lg:grid-cols-3">
           <Link
             href="/inventory/add"
-            className="rounded-2xl border border-gray-200 p-6 transition hover:shadow-lg md:p-8"
+            className="rounded-2xl border border-gray-200 bg-white p-6 transition hover:shadow-lg md:p-8"
           >
             <p className="text-2xl">+</p>
             <h2 className="mt-4 font-serif text-2xl leading-snug">Add Item</h2>
@@ -118,7 +118,7 @@ export default function DashboardPage() {
             </p>
           </Link>
 
-          <Link href="/inventory" className="rounded-2xl border border-gray-200 p-6 transition hover:shadow-lg md:p-8">
+          <Link href="/inventory" className="rounded-2xl border border-gray-200 bg-white p-6 transition hover:shadow-lg md:p-8">
             <p className="text-2xl">📦</p>
             <h2 className="mt-4 font-serif text-2xl leading-snug">Your Inventory</h2>
             <p className="mt-2 text-sm font-light leading-relaxed text-gray-600">
@@ -126,7 +126,7 @@ export default function DashboardPage() {
             </p>
           </Link>
 
-          <Link href="/recipes" className="rounded-2xl border border-gray-200 p-6 transition hover:shadow-lg md:p-8">
+          <Link href="/recipes" className="rounded-2xl border border-gray-200 bg-white p-6 transition hover:shadow-lg md:p-8">
             <p className="text-2xl">🍳</p>
             <h2 className="mt-4 font-serif text-2xl leading-snug">Discover Recipes</h2>
             <p className="mt-2 text-sm font-light leading-relaxed text-gray-600">
