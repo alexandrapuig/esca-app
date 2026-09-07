@@ -9,22 +9,6 @@ import { addFridgeItem, identifyBarcode, type BarcodeIdentification } from '@/li
 
 const CATEGORIES = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverage', 'other'] as const;
 
-function mapBarcodeToCategory(barcodeValue: string): string {
-  if (barcodeValue.startsWith('2')) {
-    return 'produce';
-  }
-
-  if (barcodeValue.startsWith('3')) {
-    return 'dairy';
-  }
-
-  if (barcodeValue.startsWith('4')) {
-    return 'meat';
-  }
-
-  return 'other';
-}
-
 function captureVideoFrameBase64(video: HTMLVideoElement): string | null {
   if (!video.videoWidth || !video.videoHeight) {
     return null;
@@ -102,11 +86,11 @@ export default function AddInventoryItemPage() {
       });
 
       if (!identification.success) {
-        if (!name.trim()) {
-          setName(`Item ${scannedCode.slice(-6)}`);
-        }
-
-        setCategory(mapBarcodeToCategory(scannedCode) as (typeof CATEGORIES)[number]);
+        // The barcode scanned fine, the product just is not in Open Food Facts
+        // and could not be identified from the image. Leave name and category
+        // untouched rather than inventing a placeholder or guessing a category
+        // from the barcode digits - a wrong prefill is more work to correct
+        // than an empty field is to fill.
         setErrorMessage(identification.error);
       } else {
         setIdentified(identification.data);

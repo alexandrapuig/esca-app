@@ -192,21 +192,24 @@ export async function identifyBarcode(params: {
       };
     }
 
-    if (params.barcodeImage) {
-      const claudeResult = normalizeResult(await identifyBarcodeWithClaude({ barcode, barcodeImage: params.barcodeImage }));
-      await setCachedBarcode(barcode, claudeResult);
+    // Claude's answers are inference, not lookup, so they are NOT cached: a
+    // wrong guess would otherwise be served to every future scan of this
+    // barcode by anyone. Only Open Food Facts records above get cached.
+    const claudeResult = params.barcodeImage
+      ? await identifyBarcodeWithClaude({ barcode, barcodeImage: params.barcodeImage })
+      : await identifyBarcodeWithClaude({ barcode });
+
+    if (claudeResult) {
       return {
         success: true,
-        data: claudeResult,
+        data: normalizeResult(claudeResult),
       };
     }
 
-    const claudeFallback = normalizeResult(await identifyBarcodeWithClaude({ barcode }));
-    await setCachedBarcode(barcode, claudeFallback);
-
     return {
-      success: true,
-      data: claudeFallback,
+      success: false,
+      status: 404,
+      error: 'Product not recognised. The barcode was scanned - add the name yourself.',
     };
   } catch (error) {
     return {

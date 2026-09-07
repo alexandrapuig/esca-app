@@ -87,7 +87,7 @@ function extractJsonFromText(rawText: string): string {
 export async function identifyBarcodeWithClaude(params: {
   barcode: string;
   barcodeImage?: string;
-}): Promise<{ name: string; category: string; typical_shelf_life_days: number }> {
+}): Promise<{ name: string; category: string; typical_shelf_life_days: number } | null> {
   const prompt = `Barcode value: ${params.barcode}\nReturn JSON only.`;
 
   const messageContent: Array<ClaudeTextContent | ClaudeImageContent> = [
@@ -109,7 +109,7 @@ export async function identifyBarcodeWithClaude(params: {
   }
 
   const output = await callClaude(
-    'You identify food products from barcodes. Return strict JSON only with keys: name, category, typical_shelf_life_days. category should be one of produce,dairy,meat,seafood,bakery,frozen,pantry,beverage,other. typical_shelf_life_days must be an integer.',
+    'You identify food products from barcodes. A barcode number does not encode what a product is, so unless you actually recognise this specific code, or an image clearly shows the product or its label, you cannot know what it is. Guessing a plausible grocery item is worse than admitting you do not know. Return strict JSON only. If you can identify it: {"name": string, "category": one of produce|dairy|meat|seafood|bakery|frozen|pantry|beverage|other, "typical_shelf_life_days": integer}. If you cannot: {"identified": false}. Do not invent a product to fill the response.',
     [
       {
         role: 'user',
@@ -123,10 +123,18 @@ export async function identifyBarcodeWithClaude(params: {
     name?: string;
     category?: string;
     typical_shelf_life_days?: number;
+    identified?: boolean;
   };
 
+  // An explicit decline, or a response missing the fields, both mean the same
+  // thing: no identification. Returning null lets the caller leave the form
+  // blank rather than filling it with a confident guess.
+  if (parsed.identified === false) {
+    return null;
+  }
+
   if (!parsed.name || !parsed.category || typeof parsed.typical_shelf_life_days !== 'number') {
-    throw new Error('Claude barcode response was missing required fields');
+    return null;
   }
 
   return {
