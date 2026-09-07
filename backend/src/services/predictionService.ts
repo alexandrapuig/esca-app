@@ -175,6 +175,30 @@ export async function generatePredictionsForUser(params: {
       };
     }
 
+    // Predictions accumulate every time the inventory page auto-regenerates,
+    // and nothing pruned them. History is kept for 90 days so a future trend
+    // chart has something to read; beyond that it is dead weight.
+    //
+    // Runs after the insert, and only deletes rows older than the cutoff, so
+    // it can never remove the predictions just written.
+    const cutoff = new Date(Date.now() - 90 * 86400000).toISOString();
+
+    const { error: pruneError } = await supabase
+      .from('spoilage_predictions')
+      .delete()
+      .eq('household_id', params.householdId)
+      .lt('created_at', cutoff);
+
+    // Not fatal: the predictions above are already saved and returned. A failed
+    // prune just means the table stays larger than intended.
+    if (pruneError) {
+      console.error('prediction prune failed', {
+        householdId: params.householdId,
+        cutoff,
+        error: pruneError,
+      });
+    }
+
     return {
       success: true,
       data: normalized,
