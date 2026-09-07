@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 const FRIDGE_ITEM_COLUMNS =
-  'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at, brand, purchase_location, purchase_price, notes';
+  'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at, brand, purchase_location, purchase_price, notes, barcode';
 
 type FridgeStatus = 'fresh' | 'consumed' | 'expired';
 type FridgeCategory =
@@ -33,6 +33,7 @@ type FridgeItemRow = {
   purchase_location: string | null;
   purchase_price: number | null;
   notes: string | null;
+  barcode: string | null;
 };
 
 export type FridgeItem = {
@@ -51,6 +52,7 @@ export type FridgeItem = {
   purchaseLocation: string | null;
   purchasePrice: number | null;
   notes: string | null;
+  barcode: string | null;
 };
 
 type ServiceSuccess<T> = {
@@ -84,6 +86,7 @@ function mapFridgeItem(row: FridgeItemRow): FridgeItem {
     purchaseLocation: row.purchase_location,
     purchasePrice: row.purchase_price,
     notes: row.notes,
+    barcode: row.barcode,
   };
 }
 
@@ -137,6 +140,7 @@ export async function createFridgeItem(params: {
   purchasePrice?: number;
   notes?: string;
   purchaseDate?: string;
+  barcode?: string;
 }): Promise<ServiceResult<FridgeItem>> {
   let supabase: SupabaseClient;
 
@@ -186,6 +190,7 @@ export async function createFridgeItem(params: {
     purchase_location: params.purchaseLocation?.trim() || null,
     purchase_price: normalizedPrice,
     notes: params.notes?.trim() || null,
+    barcode: params.barcode?.trim() || null,
   };
 
   const { data, error } = await supabase

@@ -28,6 +28,7 @@ export type FridgeItem = {
   purchaseLocation: string | null;
   purchasePrice: number | null;
   notes: string | null;
+  barcode: string | null;
 };
 
 export type BarcodeIdentification = {

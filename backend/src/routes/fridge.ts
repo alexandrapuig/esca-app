@@ -71,6 +71,7 @@ router.post('/items', async (req, res) => {
     purchasePrice?: number;
     notes?: string;
     purchaseDate?: string;
+    barcode?: string;
   } = {
     userId: request.user.id,
     householdId: request.user.householdId,
@@ -111,6 +112,10 @@ router.post('/items', async (req, res) => {
 
   if (typeof body.purchase_date === 'string') {
     createInput.purchaseDate = body.purchase_date;
+  }
+
+  if (typeof body.barcode === 'string' && body.barcode.trim()) {
+    createInput.barcode = body.barcode;
   }
 
   const result = await createFridgeItem(createInput);
@@ -257,6 +262,22 @@ router.put('/items/:id', async (req, res) => {
       error: result.error,
     });
     return;
+  }
+
+  // Correcting an item is the most natural moment to fix a wrong category, so
+  // edits teach the cache too - not just creation. Keyed on the barcode stored
+  // on the item, so manually added items teach nothing.
+  if (result.data.barcode) {
+    await learnBarcode({
+      barcode: result.data.barcode,
+      name: result.data.name,
+      category: result.data.category ?? 'other',
+      quantityText: result.data.quantity
+        ? `${result.data.quantity}${result.data.unit ? ` ${result.data.unit}` : ''}`
+        : null,
+      brand: result.data.brand,
+      typicalShelfLifeDays: result.data.typicalShelfLifeDays,
+    });
   }
 
   res.status(200).json({
