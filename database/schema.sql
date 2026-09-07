@@ -132,13 +132,16 @@ CREATE TABLE IF NOT EXISTS public.fridge_items (
   purchase_location       text,
   purchase_price          numeric,
   notes                   text,
-  household_id            uuid NOT NULL REFERENCES public.households(id) ON DELETE CASCADE
+  household_id            uuid NOT NULL REFERENCES public.households(id) ON DELETE CASCADE,
+  barcode                 text
 );
 
 CREATE INDEX IF NOT EXISTS idx_fridge_items_user_id
   ON public.fridge_items USING btree (user_id);
 CREATE INDEX IF NOT EXISTS idx_fridge_items_household_id
   ON public.fridge_items USING btree (household_id);
+CREATE INDEX IF NOT EXISTS idx_fridge_items_barcode
+  ON public.fridge_items USING btree (barcode);
 CREATE INDEX IF NOT EXISTS idx_fridge_items_storage_location
   ON public.fridge_items USING btree (storage_location);
 
@@ -245,7 +248,8 @@ CREATE TABLE IF NOT EXISTS public.barcode_cache (
   shelf_life_days integer,
   created_at      timestamptz DEFAULT now(),
   brand           text,
-  quantity_text   text
+  quantity_text   text,
+  source          text DEFAULT 'openfoodfacts'
 );
 
 -- NOTE: this table's column is shelf_life_days, NOT typical_shelf_life_days.
