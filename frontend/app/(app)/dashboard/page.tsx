@@ -10,14 +10,13 @@ import { getUserStats, type UserStats } from '@/lib/api';
 const STAT_CARDS: Array<{
   title: string;
   key: keyof UserStats;
-  icon: string;
   colors: string;
   unit?: string;
 }> = [
-  { title: 'Items Consumed', key: 'items_consumed_count', icon: '📦', colors: 'bg-amber-50 border-amber-100' },
-  { title: 'Waste Prevented', key: 'waste_prevented_kg', icon: '♻️', colors: 'bg-green-50 border-green-100', unit: 'kg' },
-  { title: 'CO₂ Saved', key: 'co2_saved_kg', icon: '🌍', colors: 'bg-teal-50 border-teal-100', unit: 'kg' },
-  { title: 'Money Saved', key: 'money_saved', icon: '💰', colors: 'bg-purple-50 border-purple-100', unit: '$' },
+  { title: 'Items Consumed', key: 'items_consumed_count', colors: 'bg-amber-50 border-amber-100' },
+  { title: 'Waste Prevented', key: 'waste_prevented_kg', colors: 'bg-green-50 border-green-100', unit: 'kg' },
+  { title: 'CO₂ Saved', key: 'co2_saved_kg', colors: 'bg-teal-50 border-teal-100', unit: 'kg' },
+  { title: 'Money Saved', key: 'money_saved', colors: 'bg-purple-50 border-purple-100', unit: '$' },
 ];
 
 export default function DashboardPage() {
@@ -96,7 +95,6 @@ export default function DashboardPage() {
           <section className="grid gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-4">
             {STAT_CARDS.map((card) => (
               <div key={card.key} className={`rounded-2xl border-2 p-6 md:p-8 ${card.colors}`}>
-                <p className="text-2xl">{card.icon}</p>
                 <p className="mt-4 text-sm text-gray-600">{card.title}</p>
                 <p className="mt-2 text-2xl font-semibold text-gray-900">
                   {card.unit === '$' ? `$${stats[card.key]}` : `${stats[card.key]}${card.unit ? ` ${card.unit}` : ''}`}
@@ -111,7 +109,6 @@ export default function DashboardPage() {
             href="/inventory/add"
             className="rounded-2xl border border-gray-200 bg-white p-6 transition hover:shadow-lg md:p-8"
           >
-            <p className="text-2xl">+</p>
             <h2 className="mt-4 font-serif text-2xl leading-snug">Add Item</h2>
             <p className="mt-2 text-sm font-light leading-relaxed text-gray-600">
               Start tracking your fresh produce and pantry items
@@ -119,7 +116,6 @@ export default function DashboardPage() {
           </Link>
 
           <Link href="/inventory" className="rounded-2xl border border-gray-200 bg-white p-6 transition hover:shadow-lg md:p-8">
-            <p className="text-2xl">📦</p>
             <h2 className="mt-4 font-serif text-2xl leading-snug">Your Inventory</h2>
             <p className="mt-2 text-sm font-light leading-relaxed text-gray-600">
               Manage and monitor all your tracked items
@@ -127,7 +123,6 @@ export default function DashboardPage() {
           </Link>
 
           <Link href="/recipes" className="rounded-2xl border border-gray-200 bg-white p-6 transition hover:shadow-lg md:p-8">
-            <p className="text-2xl">🍳</p>
             <h2 className="mt-4 font-serif text-2xl leading-snug">Discover Recipes</h2>
             <p className="mt-2 text-sm font-light leading-relaxed text-gray-600">
               AI-powered recipes from your expiring items

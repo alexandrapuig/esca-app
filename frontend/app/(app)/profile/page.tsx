@@ -93,7 +93,7 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f6f1e8] px-6 py-16 text-gray-900">
-        <section className="w-full max-w-xl rounded-2xl border border-gray-200 p-10">
+        <section className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-10">
           <div className="h-3 w-24 animate-pulse rounded-full bg-gray-200" />
           <div className="mt-6 h-10 w-3/4 animate-pulse rounded-full bg-gray-100" />
         </section>
@@ -121,7 +121,7 @@ export default function ProfilePage() {
           </div>
         ) : null}
 
-        <section className="rounded-2xl border border-gray-200 p-6 md:p-8">
+        <section className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">
           <p className="text-sm font-medium uppercase tracking-wide text-gray-500">Account information</p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <div>
@@ -140,13 +140,13 @@ export default function ProfilePage() {
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Enter your name"
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
             </div>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-gray-200 p-6 md:p-8">
+        <section className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">
           <p className="text-sm font-medium uppercase tracking-wide text-gray-500">Dietary preferences</p>
           <p className="mt-2 text-sm font-light text-gray-600">Select all that apply.</p>
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -168,7 +168,7 @@ export default function ProfilePage() {
         </section>
 
         {stats ? (
-          <section className="rounded-2xl border border-gray-200 p-6 md:p-8">
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">
             <p className="text-sm font-medium uppercase tracking-wide text-gray-500">Your impact</p>
             <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3">
               <div className="rounded-2xl border-2 border-blue-200 bg-blue-50 p-5">
@@ -191,7 +191,7 @@ export default function ProfilePage() {
           </section>
         ) : null}
 
-        <section className="rounded-2xl border border-red-200 p-6 md:p-8">
+        <section className="rounded-2xl border border-red-200 bg-white p-6 md:p-8">
           <p className="text-sm font-medium uppercase tracking-wide text-red-700">Danger zone</p>
           <h2 className="mt-4 font-serif text-2xl">Delete account</h2>
           <p className="mt-3 text-sm font-light text-gray-600">
@@ -206,7 +206,7 @@ export default function ProfilePage() {
             value={deleteConfirmText}
             onChange={(event) => setDeleteConfirmText(event.target.value)}
             placeholder={email}
-            className="w-full max-w-md rounded-lg border border-gray-300 px-4 py-3 text-gray-900 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-red-600"
+            className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-red-600"
           />
           <button
             type="button"
