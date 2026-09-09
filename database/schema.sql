@@ -471,3 +471,11 @@ drop policy if exists "Authenticated users can insert barcode cache" on public.b
 
 -- Enforce the querying user's RLS rather than the view owner's.
 alter view public.latest_spoilage_predictions set (security_invoker = on);
+
+-- 20260908_function_hardening.sql
+revoke execute on function public.handle_new_user() from anon, authenticated, public;
+
+-- Pin search_path so neither function resolves objects through a
+-- caller-controlled schema search order.
+alter function public.update_updated_at_column() set search_path = public, pg_temp;
+alter function public.handle_new_user()          set search_path = public, pg_temp;
