@@ -153,7 +153,7 @@ export default function RecipeDetailPage() {
 					</div>
 					<Link
 						href="/recipes"
-						className="inline-flex rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 transition hover:border-gray-400"
+						className="inline-flex rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition hover:border-gray-400"
 					>
 						Back to recipes
 					</Link>
@@ -182,7 +182,7 @@ export default function RecipeDetailPage() {
 					))}
 				</div>
 
-				<section className="rounded-2xl border border-gray-200 p-6 md:p-8">
+				<section className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">
 					<div className="flex flex-wrap items-baseline justify-between gap-2">
 						<h2 className="font-serif text-2xl leading-snug">Ingredients</h2>
 						{hasTags ? (
@@ -209,7 +209,7 @@ export default function RecipeDetailPage() {
 					</ul>
 				</section>
 
-				<section className="rounded-2xl border border-gray-200 p-6 md:p-8">
+				<section className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">
 					<h2 className="font-serif text-2xl leading-snug">Instructions</h2>
 					<ol className="mt-5 space-y-4">
 						{recipe.instructions.map((step, index) => (
@@ -232,14 +232,14 @@ export default function RecipeDetailPage() {
 					<button
 						type="button"
 						onClick={() => handleFlagUpdate({ saved: !recipe.saved })}
-						className="rounded-full border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400"
+						className="rounded-full border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400"
 					>
 						{recipe.saved ? '♥ Saved' : '♡ Save'}
 					</button>
 					<button
 						type="button"
 						onClick={() => handleFlagUpdate({ cooked: !recipe.cooked })}
-						className="rounded-full border border-emerald-300 px-5 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-50"
+						className="rounded-full border border-emerald-300 bg-white px-5 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-50"
 					>
 						{recipe.cooked ? '✓ Cooked' : 'Made It'}
 					</button>

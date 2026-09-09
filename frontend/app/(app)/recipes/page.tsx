@@ -169,7 +169,7 @@ export default function RecipesPage() {
         {!isLoading && visibleRecipes.length > 0 ? (
           <section className="grid gap-6 md:gap-8">
             {visibleRecipes.map((recipe) => (
-              <article key={recipe.id} className="overflow-hidden rounded-2xl border border-gray-200 transition hover:shadow-lg">
+              <article key={recipe.id} className="overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:shadow-lg">
                 <div className="flex flex-col p-6 md:p-8">
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="font-serif text-2xl leading-snug text-gray-900">{recipe.name}</h2>
@@ -228,14 +228,14 @@ export default function RecipesPage() {
                     <button
                       type="button"
                       onClick={() => handleFlagUpdate(recipe.id, { saved: !recipe.saved })}
-                      className="rounded-full border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 transition hover:border-gray-400"
+                      className="rounded-full border border-gray-300 bg-white px-4 py-2 text-xs font-medium text-gray-700 transition hover:border-gray-400"
                     >
                       {recipe.saved ? '♥ Saved' : '♡ Save'}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleFlagUpdate(recipe.id, { cooked: !recipe.cooked })}
-                      className="rounded-full border border-emerald-300 px-4 py-2 text-xs font-medium text-emerald-800 transition hover:bg-emerald-50"
+                      className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-xs font-medium text-emerald-800 transition hover:bg-emerald-50"
                     >
                       {recipe.cooked ? '✓ Cooked' : 'Made It'}
                     </button>
