@@ -10,6 +10,7 @@ import barcodeRoutes from './routes/barcode';
 import fridgeRoutes from './routes/fridge';
 import predictionsRoutes from './routes/predictions';
 import recipesRoutes from './routes/recipes';
+import recallsRoutes from './routes/recalls';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,6 +44,7 @@ app.use('/api/fridge', fridgeRoutes);
 app.use('/api/barcode', barcodeRoutes);
 app.use('/api/predictions', predictionsRoutes);
 app.use('/api/recipes', recipesRoutes);
+app.use('/api/recalls', recallsRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });

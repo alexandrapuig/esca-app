@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import RecallAlertModal from "../../components/RecallAlertModal";
+import { useRecallAlerts } from "../../hooks/useRecallAlerts";
 import { fridgeService } from "../../services/fridgeService";
 import { storageService } from "../../services/storage";
 import { FridgeItem } from "../../types";
@@ -35,6 +37,11 @@ export default function FridgeScreen() {
   const [items, setItems] = useState<FridgeItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
+  const {
+    matches: recallMatches,
+    showModal: showRecallModal,
+    handleAllResolved: handleRecallsResolved
+  } = useRecallAlerts();
 
   const loadItems = useCallback(async () => {
     setRefreshing(true);
@@ -69,6 +76,18 @@ export default function FridgeScreen() {
 
     setItems((prev) => prev.filter((item) => item.id !== id));
   };
+
+  const handleRecallResolved = useCallback((matchId: string, itemDeleted: boolean) => {
+    if (!itemDeleted) {
+      return;
+    }
+
+    const resolvedItemId = recallMatches.find((match) => match.id === matchId)?.fridge_items?.id;
+
+    if (resolvedItemId) {
+      setItems((previousItems) => previousItems.filter((item) => item.id !== resolvedItemId));
+    }
+  }, [recallMatches]);
 
   const emptyState = useMemo(
     () => (
@@ -112,6 +131,15 @@ export default function FridgeScreen() {
       <TouchableOpacity style={styles.addButton} onPress={() => router.push("/fridge/add")}>
         <Text style={styles.addButtonText}>Add Item</Text>
       </TouchableOpacity>
+      <RecallAlertModal
+        matches={recallMatches}
+        visible={showRecallModal}
+        onResolved={handleRecallResolved}
+        onAllResolved={() => {
+          handleRecallsResolved();
+          void loadItems();
+        }}
+      />
     </View>
   );
 }

@@ -59,8 +59,29 @@ export interface UserStats {
   money_saved: number;
 }
 
+export interface RecallMatch {
+  id: string;
+  match_type: string;
+  match_confidence: number;
+  created_at: string;
+  fridge_items: Pick<FridgeItem, "id" | "name" | "category"> | null;
+  recalls: {
+    product_description: string;
+    reason: string;
+    classification: string;
+    recall_date: string;
+    source: string;
+  } | null;
+}
+
+export interface ResolveRecallResult {
+  resolved: true;
+  itemDeleted: boolean;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  warning?: string;
 }
