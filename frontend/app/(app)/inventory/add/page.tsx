@@ -247,7 +247,7 @@ export default function AddInventoryItemPage() {
   return (
     <main className="min-h-screen bg-[#f6f1e8] px-6 py-10 text-gray-900 md:px-12 md:py-16">
       <div className="mx-auto w-full max-w-3xl">
-        <section className="rounded-2xl border border-gray-200 p-6 md:p-8">
+        <section className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">Add item</p>
@@ -255,7 +255,7 @@ export default function AddInventoryItemPage() {
             </div>
             <Link
               href="/inventory"
-              className="inline-flex rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 transition hover:border-gray-400"
+              className="inline-flex rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition hover:border-gray-400"
             >
               Back to inventory
             </Link>
@@ -265,7 +265,7 @@ export default function AddInventoryItemPage() {
             <label className="block">
               <span className="mb-3 block text-sm font-medium text-gray-900">Item Name *</span>
               <input
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 type="text"
                 placeholder="e.g., Organic Carrots, Greek Yogurt"
                 required
@@ -278,7 +278,7 @@ export default function AddInventoryItemPage() {
               <label className="block">
                 <span className="mb-3 block text-sm font-medium text-gray-900">Category</span>
                 <select
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   value={category}
                   onChange={(event) => setCategory(event.target.value as (typeof CATEGORIES)[number])}
                 >
@@ -293,7 +293,7 @@ export default function AddInventoryItemPage() {
               <label className="block">
                 <span className="mb-3 block text-sm font-medium text-gray-900">Quantity</span>
                 <input
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   type="text"
                   inputMode="decimal"
                   placeholder="1"
@@ -306,7 +306,7 @@ export default function AddInventoryItemPage() {
             <label className="block">
               <span className="mb-3 block text-sm font-medium text-gray-900">Unit</span>
               <input
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 type="text"
                 placeholder="e.g. pcs, kg, ml"
                 value={unit}
@@ -328,33 +328,33 @@ export default function AddInventoryItemPage() {
                   <div className="grid gap-6 sm:grid-cols-2">
                     <label className="block">
                       <span className="mb-3 block text-sm font-medium text-gray-900">Brand</span>
-                      <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="text" placeholder="e.g. Chobani" value={brand} onChange={(event) => setBrand(event.target.value)} />
+                      <input className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="text" placeholder="e.g. Chobani" value={brand} onChange={(event) => setBrand(event.target.value)} />
                     </label>
 
                     <label className="block">
                       <span className="mb-3 block text-sm font-medium text-gray-900">Purchase date</span>
-                      <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} />
+                      <input className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} />
                     </label>
 
                     <label className="block">
                       <span className="mb-3 block text-sm font-medium text-gray-900">Estimated expiry</span>
-                      <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="date" value={estimatedExpiry} onChange={(event) => { setEstimatedExpiry(event.target.value); setExpiryEdited(true); }} />
+                      <input className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="date" value={estimatedExpiry} onChange={(event) => { setEstimatedExpiry(event.target.value); setExpiryEdited(true); }} />
                     </label>
 
                     <label className="block">
                       <span className="mb-3 block text-sm font-medium text-gray-900">Purchased from</span>
-                      <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="text" placeholder="e.g. Trader Joe's" value={purchaseLocation} onChange={(event) => setPurchaseLocation(event.target.value)} />
+                      <input className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="text" placeholder="e.g. Trader Joe's" value={purchaseLocation} onChange={(event) => setPurchaseLocation(event.target.value)} />
                     </label>
 
                     <label className="block">
                       <span className="mb-3 block text-sm font-medium text-gray-900">Price paid</span>
-                      <input className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="text" inputMode="decimal" placeholder="4.99" value={purchasePrice} onChange={(event) => setPurchasePrice(event.target.value)} />
+                      <input className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" type="text" inputMode="decimal" placeholder="4.99" value={purchasePrice} onChange={(event) => setPurchasePrice(event.target.value)} />
                     </label>
                   </div>
 
                   <label className="block">
                     <span className="mb-3 block text-sm font-medium text-gray-900">Notes</span>
-                    <textarea className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" rows={3} placeholder="Anything worth remembering about this item" value={notes} onChange={(event) => setNotes(event.target.value)} />
+                    <textarea className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600" rows={3} placeholder="Anything worth remembering about this item" value={notes} onChange={(event) => setNotes(event.target.value)} />
                   </label>
                 </div>
               ) : null}
