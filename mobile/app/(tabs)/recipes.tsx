@@ -1,5 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -29,19 +29,77 @@ export default function RecipesScreen() {
     }
   }, []);
 
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
   const refreshRecipes = useCallback(async () => {
     setRefreshing(true);
     const generated = await recipeService.generateRecipes();
 
-    if (generated.success && generated.data) {
-      setRecipes(generated.data);
-      await storageService.saveRecipes(generated.data);
-    } else {
+    if (!generated.success || !generated.data) {
       Alert.alert("Error", generated.error || "Failed to generate recipes.");
+      setRefreshing(false);
+      return;
     }
 
-    setRefreshing(false);
-  }, []);
+    const jobId = generated.data.id;
+    const startedAt = Date.now();
+    const POLL_INTERVAL_MS = 2500;
+    const TIMEOUT_MS = 90000;
+
+    clearPolling();
+
+    pollIntervalRef.current = setInterval(async () => {
+      const jobResult = await recipeService.getRecipeJob(jobId);
+
+      if (!jobResult.success || !jobResult.data) {
+        clearPolling();
+        Alert.alert("Error", jobResult.error || "Failed to check recipe generation status.");
+        setRefreshing(false);
+        return;
+      }
+
+      const job = jobResult.data;
+
+      if (job.status === "done") {
+        clearPolling();
+        const latest = await recipeService.getRecipes();
+
+        if (latest.success && latest.data) {
+          setRecipes(latest.data);
+          await storageService.saveRecipes(latest.data);
+        }
+
+        setRefreshing(false);
+        return;
+      }
+
+      if (job.status === "failed") {
+        clearPolling();
+        Alert.alert("Error", job.error || "Recipe generation failed.");
+        setRefreshing(false);
+        return;
+      }
+
+      if (Date.now() - startedAt > TIMEOUT_MS) {
+        clearPolling();
+        Alert.alert("Error", "Recipe generation is taking longer than expected. Please try again.");
+        setRefreshing(false);
+      }
+    }, POLL_INTERVAL_MS);
+  }, [clearPolling]);
+
+  useEffect(() => {
+    return () => {
+      clearPolling();
+    };
+  }, [clearPolling]);
 
   useFocusEffect(
     useCallback(() => {
