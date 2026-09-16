@@ -52,7 +52,9 @@ async function callClaude(
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
       },
-      timeout: 30000,
+      // Vercel Pro allows 60s per function; stay just under it. Recipe
+      // generation runs close to this, which is why it was timing out at 30s.
+      timeout: 55000,
     },
   );
 
@@ -274,7 +276,7 @@ export async function generateRecipesWithClaude(params: {
   dietaryRestrictions: string[];
 }): Promise<RecipeSuggestionResult[]> {
   const output = await callClaude(
-    `You are a creative chef helping reduce food waste. Suggest 2-3 recipes built mainly from the user's inventory, prioritizing the at-risk items. Return JSON array with name, description, cuisine, dietary_tags (list), ingredients (list of plain strings), ingredient_details (list), instructions (list), difficulty (easy|medium|hard), prep_time_minutes, and reasoning.
+    `You are a creative chef helping reduce food waste. Suggest 2 recipes built mainly from the user's inventory, prioritizing the at-risk items. Return JSON array with name, description, cuisine, dietary_tags (list), ingredients (list of plain strings), ingredient_details (list), instructions (list), difficulty (easy|medium|hard), prep_time_minutes, and reasoning.
 
 ingredient_details must have one entry per ingredient, in the same order as ingredients, each an object with:
   text   - the ingredient as written in ingredients

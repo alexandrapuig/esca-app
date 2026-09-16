@@ -19,29 +19,6 @@ export type StoredRecipeSuggestion = RecipeSuggestionResult & {
   created_at: string;
 };
 
-function fallbackRecipes(atRiskItems: AtRiskItem[]): RecipeSuggestionResult[] {
-  const ingredientNames = atRiskItems.map((item) => item.name);
-
-  if (ingredientNames.length === 0) {
-    return [];
-  }
-
-  return [
-    {
-      name: 'Quick Zero-Waste Stir Fry',
-      description: 'A fast stir fry using your highest-risk ingredients first.',
-      cuisine: 'other',
-      dietary_tags: [],
-      ingredients: ingredientNames,
-      ingredient_details: ingredientNames.map((name) => ({ text: name, status: 'owned' })),
-      instructions: ['Prep ingredients', 'Saute aromatics', 'Cook ingredients by firmness', 'Season and serve'],
-      difficulty: 'easy',
-      prep_time_minutes: 20,
-      reasoning: 'This recipe consumes ingredients that are closest to spoiling.',
-    },
-  ];
-}
-
 export async function generateRecipesForUser(params: {
   userId: string;
   householdId: string;
@@ -140,13 +117,12 @@ export async function generateRecipesForUser(params: {
       });
     } catch (error) {
       console.error('generateRecipesWithClaude failed', error);
-      // TEMPORARY DIAGNOSTIC - remove once the Claude failure is identified.
-      // The fallback is bypassed so the real error reaches the browser;
-      // Vercel runtime logs are not reachable.
+      // No fabricated fallback: a made-up recipe reads as real and is worse
+      // than an honest failure. Same reasoning as barcode identification.
       return {
         success: false,
-        status: 500,
-        error: `DIAGNOSTIC: ${error instanceof Error ? error.message : String(error)}`,
+        status: 503,
+        error: 'Recipe generation took too long. Please try again.',
       };
     }
 
