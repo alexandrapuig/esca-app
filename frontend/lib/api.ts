@@ -282,10 +282,26 @@ export async function getLatestPredictions(): Promise<ApiResult<SpoilagePredicti
   });
 }
 
-export async function generateRecipes(): Promise<ApiResult<RecipeSuggestion[]>> {
-  return apiRequest<RecipeSuggestion[]>('/api/recipes/generate', {
+export type RecipeJob = {
+  id: string;
+  status: 'pending' | 'running' | 'done' | 'failed';
+  error: string | null;
+  recipe_count: number | null;
+  created_at: string;
+};
+
+// Generation runs as a background job: this starts one (or joins the
+// household's in-flight job) and returns immediately. Poll getRecipeJob.
+export async function generateRecipes(): Promise<ApiResult<RecipeJob>> {
+  return apiRequest<RecipeJob>('/api/recipes/generate', {
     method: 'POST',
     body: JSON.stringify({}),
+  });
+}
+
+export async function getRecipeJob(jobId: string): Promise<ApiResult<RecipeJob>> {
+  return apiRequest<RecipeJob>(`/api/recipes/jobs/${jobId}`, {
+    method: 'GET',
   });
 }
 
