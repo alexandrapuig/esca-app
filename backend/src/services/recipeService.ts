@@ -87,10 +87,7 @@ export async function generateRecipesForUser(params: {
       .filter((item): item is AtRiskItem => Boolean(item));
 
     if (atRiskItems.length === 0) {
-      return {
-        success: true,
-        data: [],
-      };
+      return { success: true, data: [] };
     }
 
     const { data: userRow } = await supabase
@@ -143,7 +140,14 @@ export async function generateRecipesForUser(params: {
       });
     } catch (error) {
       console.error('generateRecipesWithClaude failed', error);
-      recipes = fallbackRecipes(atRiskItems);
+      // TEMPORARY DIAGNOSTIC - remove once the Claude failure is identified.
+      // The fallback is bypassed so the real error reaches the browser;
+      // Vercel runtime logs are not reachable.
+      return {
+        success: false,
+        status: 500,
+        error: `DIAGNOSTIC: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
 
     if (recipes.length > 0) {
