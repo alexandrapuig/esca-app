@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 
-import { generateRecipesForUser, listRecipesForUser, updateRecipeSuggestionFlags } from '../services/recipeService';
+import { createOrReturnRecipeJob, getRecipeJob, listRecipesForUser, runRecipeJob, updateRecipeSuggestionFlags } from '../services/recipeService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
 import { trackEvent } from '../services/analyticsService';
 
@@ -20,21 +20,9 @@ function getAuthenticatedRequest(req: Request): AuthenticatedRequest {
 router.post('/generate', async (req, res) => {
   const request = getAuthenticatedRequest(req);
 
-  const result = await generateRecipesForUser({
+  const result = await createOrReturnRecipeJob({
     userId: request.user.id,
     householdId: request.user.householdId,
-  });
-
-  // A zero count means the at-risk pool was empty - worth distinguishing from
-  // a generation that failed, since they look the same to the user.
-  void trackEvent({
-    eventName: 'recipes_generated',
-    userId: request.user.id,
-    householdId: request.user.householdId,
-    properties: {
-      success: result.success,
-      count: result.success ? result.data.length : 0,
-    },
   });
 
   if (!result.success) {
@@ -45,10 +33,37 @@ router.post('/generate', async (req, res) => {
     return;
   }
 
-  res.status(200).json({
+  // Respond before the work starts. recipes_generated is tracked by the job
+  // runner now, since at this point nothing has been generated yet.
+  res.status(202).json({
     success: true,
     data: result.data,
   });
+
+  // Deliberately not awaited: the response is already sent.
+  if (result.created) {
+    void runRecipeJob({
+      jobId: result.data.id,
+      userId: request.user.id,
+      householdId: request.user.householdId,
+    });
+  }
+});
+
+router.get('/jobs/:id', async (req, res) => {
+  const request = getAuthenticatedRequest(req);
+
+  const result = await getRecipeJob({
+    jobId: req.params.id,
+    householdId: request.user.householdId,
+  });
+
+  if (!result.success) {
+    res.status(result.status).json({ success: false, error: result.error });
+    return;
+  }
+
+  res.status(200).json({ success: true, data: result.data });
 });
 
 router.get('/', async (req, res) => {
