@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { generateRecipes, getRecipes, type RecipeSuggestion, updateRecipe } from '@/lib/api';
+import { generateRecipes, getRecipeJob, getRecipes, type RecipeSuggestion, updateRecipe } from '@/lib/api';
 
 function difficultyStyles(level: RecipeSuggestion['difficulty']): string {
   if (level === 'hard') {
@@ -23,6 +23,7 @@ export default function RecipesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     async function loadRecipes() {
@@ -42,6 +43,19 @@ export default function RecipesPage() {
     void loadRecipes();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      clearPolling();
+    };
+  }, []);
+
+  function clearPolling() {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }
+
   async function handleGenerateRecipes() {
     setErrorMessage('');
     setIsGenerating(true);
@@ -54,13 +68,50 @@ export default function RecipesPage() {
       return;
     }
 
-    const latest = await getRecipes();
+    const jobId = result.data.id;
+    const startedAt = Date.now();
+    const POLL_INTERVAL_MS = 2500;
+    const TIMEOUT_MS = 90000;
 
-    if (latest.success) {
-      setRecipes(latest.data);
-    }
+    clearPolling();
 
-    setIsGenerating(false);
+    pollIntervalRef.current = setInterval(async () => {
+      const jobResult = await getRecipeJob(jobId);
+
+      if (!jobResult.success) {
+        clearPolling();
+        setErrorMessage(jobResult.error);
+        setIsGenerating(false);
+        return;
+      }
+
+      const job = jobResult.data;
+
+      if (job.status === 'done') {
+        clearPolling();
+        const latest = await getRecipes();
+
+        if (latest.success) {
+          setRecipes(latest.data);
+        }
+
+        setIsGenerating(false);
+        return;
+      }
+
+      if (job.status === 'failed') {
+        clearPolling();
+        setErrorMessage(job.error ?? 'Recipe generation failed');
+        setIsGenerating(false);
+        return;
+      }
+
+      if (Date.now() - startedAt > TIMEOUT_MS) {
+        clearPolling();
+        setErrorMessage('Recipe generation is taking longer than expected. Please try again.');
+        setIsGenerating(false);
+      }
+    }, POLL_INTERVAL_MS);
   }
 
   async function handleFlagUpdate(recipeId: string, payload: { saved?: boolean; cooked?: boolean }) {
