@@ -1,5 +1,6 @@
 import { generateRecipesWithClaude, type RecipeSuggestionResult } from './aiService';
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
+import { trackEvent } from './analyticsService';
 
 type AtRiskItem = {
   id: string;
@@ -278,5 +279,157 @@ export async function updateRecipeSuggestionFlags(params: {
       status: 500,
       error: error instanceof Error ? error.message : 'Unable to update recipe suggestion',
     };
+  }
+}
+
+// --- Async generation jobs ---
+//
+// Claude calls run close to the platform function limit, so generation moved
+// off the request path. The route creates a job and returns; this runs it.
+
+const STALE_JOB_MINUTES = 5;
+
+export type RecipeJob = {
+  id: string;
+  status: 'pending' | 'running' | 'done' | 'failed';
+  error: string | null;
+  recipe_count: number | null;
+  created_at: string;
+};
+
+const JOB_COLUMNS = 'id, status, error, recipe_count, created_at';
+
+/**
+ * Returns the household's in-flight job if one exists, otherwise creates one.
+ * A job left pending or running past STALE_JOB_MINUTES is treated as dead --
+ * a crashed run must not block every future generation.
+ */
+export async function createOrReturnRecipeJob(params: {
+  userId: string;
+  householdId: string;
+}): Promise<{ success: true; data: RecipeJob; created: boolean } | { success: false; status: number; error: string }> {
+  try {
+    const supabase = getSupabaseAdminClient();
+    const cutoff = new Date(Date.now() - STALE_JOB_MINUTES * 60 * 1000).toISOString();
+
+    const { data: existing, error: existingError } = await supabase
+      .from('recipe_generation_jobs')
+      .select(JOB_COLUMNS)
+      .eq('household_id', params.householdId)
+      .in('status', ['pending', 'running'])
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .returns<RecipeJob[]>();
+
+    if (existingError) {
+      return { success: false, status: 500, error: 'Unable to check for running generation' };
+    }
+
+    const [inFlight] = existing ?? [];
+
+    if (inFlight) {
+      return { success: true, data: inFlight, created: false };
+    }
+
+    const { data: created, error: insertError } = await supabase
+      .from('recipe_generation_jobs')
+      .insert({ household_id: params.householdId, user_id: params.userId, status: 'pending' })
+      .select(JOB_COLUMNS)
+      .single<RecipeJob>();
+
+    if (insertError || !created) {
+      return { success: false, status: 500, error: 'Unable to start recipe generation' };
+    }
+
+    return { success: true, data: created, created: true };
+  } catch (error) {
+    return {
+      success: false,
+      status: 500,
+      error: error instanceof Error ? error.message : 'Unable to start recipe generation',
+    };
+  }
+}
+
+export async function getRecipeJob(params: {
+  jobId: string;
+  householdId: string;
+}): Promise<{ success: true; data: RecipeJob } | { success: false; status: number; error: string }> {
+  try {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from('recipe_generation_jobs')
+      .select(JOB_COLUMNS)
+      .eq('id', params.jobId)
+      .eq('household_id', params.householdId)
+      .single<RecipeJob>();
+
+    if (error || !data) {
+      return { success: false, status: 404, error: 'Job not found' };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      status: 500,
+      error: error instanceof Error ? error.message : 'Unable to fetch job',
+    };
+  }
+}
+
+/**
+ * Runs a job to completion. Deliberately never throws: it is called without
+ * await from the route, so an unhandled rejection would have nowhere to go.
+ * Every outcome is written to the job row instead.
+ */
+export async function runRecipeJob(params: {
+  jobId: string;
+  userId: string;
+  householdId: string;
+}): Promise<void> {
+  const supabase = getSupabaseAdminClient();
+
+  async function setStatus(fields: Record<string, unknown>): Promise<void> {
+    const { error } = await supabase
+      .from('recipe_generation_jobs')
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq('id', params.jobId);
+
+    if (error) {
+      console.error('recipe job status update failed', { jobId: params.jobId, error });
+    }
+  }
+
+  await setStatus({ status: 'running' });
+
+  try {
+    const result = await generateRecipesForUser({
+      userId: params.userId,
+      householdId: params.householdId,
+    });
+
+    void trackEvent({
+      eventName: 'recipes_generated',
+      userId: params.userId,
+      householdId: params.householdId,
+      properties: {
+        success: result.success,
+        count: result.success ? result.data.length : 0,
+      },
+    });
+
+    if (!result.success) {
+      await setStatus({ status: 'failed', error: result.error });
+      return;
+    }
+
+    await setStatus({ status: 'done', recipe_count: result.data.length });
+  } catch (error) {
+    await setStatus({
+      status: 'failed',
+      error: error instanceof Error ? error.message : 'Recipe generation failed',
+    });
   }
 }
