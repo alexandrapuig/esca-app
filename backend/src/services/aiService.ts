@@ -276,7 +276,7 @@ export async function generateRecipesWithClaude(params: {
   dietaryRestrictions: string[];
 }): Promise<RecipeSuggestionResult[]> {
   const output = await callClaude(
-    `You are a creative chef helping reduce food waste. Suggest 2 recipes built mainly from the user's inventory, prioritizing the at-risk items. Return JSON array with name, description, cuisine, dietary_tags (list), ingredients (list of plain strings), ingredient_details (list), instructions (list), difficulty (easy|medium|hard), prep_time_minutes, and reasoning.
+    `You are a creative chef helping reduce food waste. Suggest 3 recipes built mainly from the user's inventory, prioritizing the at-risk items. Return JSON array with name, description, cuisine, dietary_tags (list), ingredients (list of plain strings), ingredient_details (list), instructions (list), difficulty (easy|medium|hard), prep_time_minutes, and reasoning.
 
 ingredient_details must have one entry per ingredient, in the same order as ingredients, each an object with:
   text   - the ingredient as written in ingredients
