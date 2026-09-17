@@ -276,7 +276,7 @@ export async function generateRecipesWithClaude(params: {
   dietaryRestrictions: string[];
 }): Promise<RecipeSuggestionResult[]> {
   const output = await callClaude(
-    `You are a creative chef helping reduce food waste. Suggest 3 recipes built mainly from the user's inventory, prioritizing the at-risk items. Return JSON array with name, description, cuisine, dietary_tags (list), ingredients (list of plain strings), ingredient_details (list), instructions (list), difficulty (easy|medium|hard), prep_time_minutes, and reasoning.
+    `You are a creative chef helping reduce food waste. Suggest 3 recipes built mainly from the user's inventory, prioritizing the at-risk items. Return JSON array with name, description, cuisine, dietary_tags (list), ingredient_details (list), instructions (list), difficulty (easy|medium|hard), prep_time_minutes, and reasoning. Do not include a separate ingredients field - ingredient_details is the only ingredient list needed.
 
 ingredient_details must have one entry per ingredient, in the same order as ingredients, each an object with:
   text   - the ingredient as written in ingredients
@@ -317,13 +317,11 @@ dietary_tags MUST only contain values from this exact list, and only where the r
 
   const allowedStatuses = ['owned', 'partial', 'missing', 'staple'];
 
-  return parsed.map((recipe) => ({
-    name: recipe.name,
-    description: recipe.description,
-    cuisine: typeof recipe.cuisine === 'string' ? recipe.cuisine.trim().toLowerCase() : 'other',
-    dietary_tags: normalizeDietaryTags(recipe.dietary_tags),
-    ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
-    ingredient_details: Array.isArray(recipe.ingredient_details)
+  return parsed.map((recipe) => {
+    // ingredient_details is the only ingredient list Claude generates now;
+    // ingredients is derived from it here so nothing downstream needs to
+    // change, and Claude is not asked to write every ingredient name twice.
+    const ingredientDetails: RecipeIngredientDetail[] = Array.isArray(recipe.ingredient_details)
       ? recipe.ingredient_details
           .filter((detail): detail is RecipeIngredientDetail =>
             Boolean(detail) && typeof detail.text === 'string' && allowedStatuses.includes(detail.status),
@@ -333,10 +331,19 @@ dietary_tags MUST only contain values from this exact list, and only where the r
             status: detail.status,
             ...(detail.status === 'partial' && typeof detail.note === 'string' ? { note: detail.note } : {}),
           }))
-      : [],
-    instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
-    difficulty: recipe.difficulty,
-    prep_time_minutes: Math.max(1, Math.floor(recipe.prep_time_minutes)),
-    reasoning: recipe.reasoning,
-  }));
+      : [];
+
+    return {
+      name: recipe.name,
+      description: recipe.description,
+      cuisine: typeof recipe.cuisine === 'string' ? recipe.cuisine.trim().toLowerCase() : 'other',
+      dietary_tags: normalizeDietaryTags(recipe.dietary_tags),
+      ingredients: ingredientDetails.map((detail) => detail.text),
+      ingredient_details: ingredientDetails,
+      instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
+      difficulty: recipe.difficulty,
+      prep_time_minutes: Math.max(1, Math.floor(recipe.prep_time_minutes)),
+      reasoning: recipe.reasoning,
+    };
+  });
 }
