@@ -120,10 +120,27 @@ export async function generateRecipesForUser(params: {
       console.error('generateRecipesWithClaude failed', error);
       // No fabricated fallback: a made-up recipe reads as real and is worse
       // than an honest failure. Same reasoning as barcode identification.
+
+      // TEMPORARY DIAGNOSTIC: the fixed message above reported every failure
+      // as a timeout, including ones that failed in 38s. Surface the real
+      // error so the job row says what actually threw. Revert after.
+      const err = error as {
+        message?: string;
+        code?: string;
+        response?: { status?: number; data?: unknown };
+      };
+
+      const parts = [
+        `message=${err?.message ?? 'none'}`,
+        `code=${err?.code ?? 'none'}`,
+        `httpStatus=${err?.response?.status ?? 'none'}`,
+        `body=${err?.response?.data ? JSON.stringify(err.response.data).slice(0, 300) : 'none'}`,
+      ];
+
       return {
         success: false,
         status: 503,
-        error: 'Recipe generation took too long. Please try again.',
+        error: `DIAGNOSTIC: ${parts.join(' | ')}`,
       };
     }
 
