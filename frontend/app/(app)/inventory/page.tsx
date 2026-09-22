@@ -438,7 +438,7 @@ function InventoryPageContent() {
                           return (
                             <>
                         <td className="px-4 py-4 font-semibold text-stone-900">{item.name}</td>
-                        <td className="px-4 py-4 text-stone-700">{item.category ?? '-'}</td>
+                        <td className="px-4 py-4 text-stone-700 capitalize">{item.category ?? '-'}</td>
                         <td className="px-4 py-4 text-stone-700">{formatDate(item.purchaseDate)}</td>
                         <td className="px-4 py-4 text-stone-700">{formatDate(item.estimatedExpiry)}</td>
                         <td className="px-4 py-4 text-stone-700">
@@ -531,7 +531,7 @@ function InventoryPageContent() {
                     <div className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getRiskBadgeStyles(risk)}`}>
                       {getRiskLabel(risk)}
                     </div>
-                    <p className="mt-2 text-sm text-stone-600">{item.category ?? 'other'}</p>
+                    <p className="mt-2 text-sm text-stone-600 capitalize">{item.category ?? 'other'}</p>
                     <p className="mt-2 text-sm text-stone-600">Purchased: {formatDate(item.purchaseDate)}</p>
                     <p className="mt-1 text-sm text-stone-600">Expiry: {formatDate(item.estimatedExpiry)}</p>
                     <p className="mt-1 text-sm text-stone-600">Days until expiry: {daysUntilExpiry(item.estimatedExpiry) ?? '-'}</p>

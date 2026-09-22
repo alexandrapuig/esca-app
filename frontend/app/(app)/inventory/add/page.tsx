@@ -399,7 +399,7 @@ export default function AddInventoryItemPage() {
                         <span className="font-medium">Identified product:</span> {identified.name}
                       </p>
                       <p>
-                        <span className="font-medium">Category:</span> {identified.category}
+                        <span className="font-medium">Category:</span> <span className="capitalize">{identified.category}</span>
                       </p>
                       <p>
                         <span className="font-medium">Estimated shelf life:</span> {identified.typical_shelf_life_days} days
