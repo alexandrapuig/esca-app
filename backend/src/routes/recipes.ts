@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 
-import { createOrReturnRecipeJob, getRecipeJob, listRecipesForUser, runRecipeJob, updateRecipeSuggestionFlags } from '../services/recipeService';
+import { claimPendingRecipeJob, createOrReturnRecipeJob, getRecipeJob, listRecipesForUser, runRecipeJob, updateRecipeSuggestionFlags } from '../services/recipeService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
 import { trackEvent } from '../services/analyticsService';
 
@@ -10,6 +10,77 @@ type UpdateRecipeBody = {
 };
 
 const router = Router();
+
+/**
+ * Cron worker. Vercel invokes this on a schedule with
+ * Authorization: Bearer <CRON_SECRET>.
+ *
+ * Mounted BEFORE requireAuth: the cron caller has no Supabase session, it
+ * authenticates with the shared secret instead.
+ *
+ * Claims one pending job and runs it to completion, awaited -- the whole
+ * point is that the work happens inside an invocation that is kept alive by
+ * the pending response, rather than after the response has been sent.
+ */
+router.post('/process', async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    console.error('CRON_SECRET is not configured');
+    res.status(503).json({ success: false, error: 'Recipe worker is not configured' });
+    return;
+  }
+
+  if (req.header('authorization') !== `Bearer ${cronSecret}`) {
+    res.status(401).json({ success: false, error: 'Unauthorized' });
+    return;
+  }
+
+  const job = await claimPendingRecipeJob();
+
+  if (!job) {
+    res.status(200).json({ success: true, data: { claimed: false } });
+    return;
+  }
+
+  await runRecipeJob({
+    jobId: job.id,
+    userId: job.user_id,
+    householdId: job.household_id,
+  });
+
+  res.status(200).json({ success: true, data: { claimed: true, jobId: job.id } });
+});
+
+router.get('/process', async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    console.error('CRON_SECRET is not configured');
+    res.status(503).json({ success: false, error: 'Recipe worker is not configured' });
+    return;
+  }
+
+  if (req.header('authorization') !== `Bearer ${cronSecret}`) {
+    res.status(401).json({ success: false, error: 'Unauthorized' });
+    return;
+  }
+
+  const job = await claimPendingRecipeJob();
+
+  if (!job) {
+    res.status(200).json({ success: true, data: { claimed: false } });
+    return;
+  }
+
+  await runRecipeJob({
+    jobId: job.id,
+    userId: job.user_id,
+    householdId: job.household_id,
+  });
+
+  res.status(200).json({ success: true, data: { claimed: true, jobId: job.id } });
+});
 
 router.use(requireAuth);
 
@@ -40,14 +111,13 @@ router.post('/generate', async (req, res) => {
     data: result.data,
   });
 
-  // Deliberately not awaited: the response is already sent.
-  if (result.created) {
-    void runRecipeJob({
-      jobId: result.data.id,
-      userId: request.user.id,
-      householdId: request.user.householdId,
-    });
-  }
+  // The job is left pending for the cron worker to claim.
+  //
+  // This used to call runRecipeJob without awaiting it. That only works on a
+  // long-running server: Vercel's Express preset wraps the app as a
+  // serverless function, so the instance can be frozen the moment the
+  // response is sent, and the work silently never finishes. Confirmed by two
+  // jobs stuck in 'running' forever on Sept 19.
 });
 
 router.get('/jobs/:id', async (req, res) => {

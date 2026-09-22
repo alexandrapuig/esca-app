@@ -450,3 +450,56 @@ export async function runRecipeJob(params: {
     });
   }
 }
+
+/**
+ * Claims the oldest pending job for the cron worker.
+ *
+ * The update is filtered on status = 'pending', so if two invocations race,
+ * only one gets a row back -- the other sees zero rows and stops. Without
+ * this, both would run the same job, paying Claude twice and racing the
+ * dedupe delete against each other.
+ *
+ * Returns null when there is nothing to do, which is the common case.
+ */
+export async function claimPendingRecipeJob(): Promise<
+  { id: string; user_id: string; household_id: string } | null
+> {
+  const supabase = getSupabaseAdminClient();
+
+  const { data: candidates, error: selectError } = await supabase
+    .from('recipe_generation_jobs')
+    .select('id, user_id, household_id')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .returns<{ id: string; user_id: string; household_id: string }[]>();
+
+  if (selectError) {
+    console.error('claimPendingRecipeJob select failed', selectError);
+    return null;
+  }
+
+  const [candidate] = candidates ?? [];
+
+  if (!candidate) {
+    return null;
+  }
+
+  const { data: claimed, error: claimError } = await supabase
+    .from('recipe_generation_jobs')
+    .update({ status: 'running', updated_at: new Date().toISOString() })
+    .eq('id', candidate.id)
+    .eq('status', 'pending')
+    .select('id, user_id, household_id')
+    .returns<{ id: string; user_id: string; household_id: string }[]>();
+
+  if (claimError) {
+    console.error('claimPendingRecipeJob claim failed', claimError);
+    return null;
+  }
+
+  // Zero rows means another invocation claimed it first.
+  const [job] = claimed ?? [];
+
+  return job ?? null;
+}
