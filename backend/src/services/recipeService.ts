@@ -121,26 +121,45 @@ export async function generateRecipesForUser(params: {
       // No fabricated fallback: a made-up recipe reads as real and is worse
       // than an honest failure. Same reasoning as barcode identification.
 
-      // TEMPORARY DIAGNOSTIC: the fixed message above reported every failure
-      // as a timeout, including ones that failed in 38s. Surface the real
-      // error so the job row says what actually threw. Revert after.
+      // Categorised rather than one fixed message. A single "took too long"
+      // label hid an expired API key for two days (Sept 18-21): every 401
+      // was reported as a timeout. The bracketed tag lands in the job row,
+      // which is the only place failures are visible, since Vercel runtime
+      // logs are unreachable.
       const err = error as {
         message?: string;
         code?: string;
-        response?: { status?: number; data?: unknown };
+        response?: { status?: number };
       };
 
-      const parts = [
-        `message=${err?.message ?? 'none'}`,
-        `code=${err?.code ?? 'none'}`,
-        `httpStatus=${err?.response?.status ?? 'none'}`,
-        `body=${err?.response?.data ? JSON.stringify(err.response.data).slice(0, 300) : 'none'}`,
-      ];
+      const httpStatus = err?.response?.status;
+      const message = err?.message ?? '';
+      let userMessage = 'Recipe generation failed. Please try again.';
+      let tag = 'unknown';
+
+      if (httpStatus === 401 || httpStatus === 403) {
+        userMessage = 'Recipe service is misconfigured. Please contact support.';
+        tag = `http ${httpStatus}`;
+      } else if (httpStatus === 429) {
+        userMessage = 'Recipe service is busy. Please try again in a minute.';
+        tag = 'http 429';
+      } else if (typeof httpStatus === 'number' && httpStatus >= 500) {
+        userMessage = 'Recipe service is temporarily unavailable. Please try again.';
+        tag = `http ${httpStatus}`;
+      } else if (err?.code === 'ECONNABORTED' || err?.code === 'ETIMEDOUT' || message.includes('timeout')) {
+        userMessage = 'Recipe generation took too long. Please try again.';
+        tag = 'timeout';
+      } else if (error instanceof SyntaxError || message.includes('not an array')) {
+        userMessage = 'Recipe generation returned an unexpected response. Please try again.';
+        tag = 'parse';
+      } else if (typeof httpStatus === 'number') {
+        tag = `http ${httpStatus}`;
+      }
 
       return {
         success: false,
         status: 503,
-        error: `DIAGNOSTIC: ${parts.join(' | ')}`,
+        error: `${userMessage} [${tag}]`,
       };
     }
 
