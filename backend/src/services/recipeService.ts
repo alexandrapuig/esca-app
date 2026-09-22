@@ -64,9 +64,10 @@ export async function generateRecipesForUser(params: {
       })
       .filter((item): item is AtRiskItem => Boolean(item));
 
-    if (atRiskItems.length === 0) {
-      return { success: true, data: [] };
-    }
+    // No early return when nothing is at risk. Items without an expiry date
+    // never get a prediction, so requiring at-risk items meant a fridge of
+    // undated food produced no recipes at all. At-risk items are a priority
+    // passed to the prompt, not a requirement.
 
     const { data: userRow } = await supabase
       .from('users')
@@ -74,12 +75,26 @@ export async function generateRecipesForUser(params: {
       .eq('id', params.userId)
       .single<UserRow>();
 
-    const { data: inventoryRows } = await supabase
+    const { data: inventoryRows, error: inventoryError } = await supabase
       .from('fridge_items')
       .select('name, category, quantity, unit')
       .eq('household_id', params.householdId)
       .eq('status', 'fresh')
       .returns<{ name: string; category: string | null; quantity: number | null; unit: string | null }[]>();
+
+    // Inventory is the primary input now. A failed read must not silently
+    // become an empty fridge -- Claude would mark every ingredient missing.
+    if (inventoryError) {
+      return { success: false, status: 500, error: 'Unable to load inventory' };
+    }
+
+    if (!inventoryRows || inventoryRows.length === 0) {
+      return {
+        success: false,
+        status: 400,
+        error: 'Add some items to your inventory to get recipe suggestions.',
+      };
+    }
 
     // What the household kept from previous generations. Cooked is the
     // stronger signal; both are sent and labelled. Capped at 20 so a long
