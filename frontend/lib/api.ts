@@ -18,6 +18,9 @@ export type FridgeItem = {
   name: string;
   category: string | null;
   quantity: number | null;
+  size: number | null;
+  sizeUnit: string | null;
+  /** @deprecated Kept for older clients. Use size/sizeUnit. */
   unit: string | null;
   typicalShelfLifeDays: number | null;
   purchaseDate: string;
@@ -153,7 +156,8 @@ export async function addFridgeItem(input: {
   name: string;
   category: string;
   quantity?: number;
-  unit?: string;
+  size?: number;
+  size_unit?: string;
   typical_shelf_life_days?: number;
   brand?: string;
   purchase_location?: string;
@@ -185,7 +189,8 @@ export async function updateFridgeItem(
     name?: string;
     category?: string;
     quantity?: number | null;
-    unit?: string | null;
+    size?: number | null;
+    size_unit?: string | null;
     typical_shelf_life_days?: number | null;
     estimated_expiry?: string | null;
     purchase_date?: string;

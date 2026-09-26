@@ -9,6 +9,35 @@ import { addFridgeItem, identifyBarcode, type BarcodeIdentification } from '@/li
 
 const CATEGORIES = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverage', 'other'] as const;
 
+// Must match SIZE_UNITS in backend/src/services/fridgeService.ts. 'fl oz' is
+// volume and 'oz' is mass; they are not interchangeable.
+const SIZE_UNITS = ['g', 'kg', 'ml', 'l', 'oz', 'lb', 'fl oz', 'other'] as const;
+
+const SIZE_UNIT_ALIASES: Record<string, string> = {
+  g: 'g', gram: 'g', grams: 'g',
+  kg: 'kg', kilogram: 'kg', kilograms: 'kg',
+  ml: 'ml', millilitre: 'ml', millilitres: 'ml', milliliter: 'ml', milliliters: 'ml',
+  l: 'l', litre: 'l', litres: 'l', liter: 'l', liters: 'l',
+  oz: 'oz', ounce: 'oz', ounces: 'oz',
+  lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb',
+  'fl oz': 'fl oz', 'fluid ounce': 'fl oz', 'fluid ounces': 'fl oz',
+};
+
+/**
+ * Maps a free-text unit from Open Food Facts onto the fixed list. Returns an
+ * empty string when it does not match, so the dropdown stays unset rather
+ * than defaulting to 'other' on a spelling we simply have not listed.
+ */
+function normalizeSizeUnit(value: string): string {
+  const raw = value.trim().toLowerCase();
+
+  if (!raw) {
+    return '';
+  }
+
+  return SIZE_UNIT_ALIASES[raw] ?? '';
+}
+
 function captureVideoFrameBase64(video: HTMLVideoElement): string | null {
   if (!video.videoWidth || !video.videoHeight) {
     return null;
@@ -37,7 +66,8 @@ export default function AddInventoryItemPage() {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('other');
   const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState('');
+  const [size, setSize] = useState('');
+  const [sizeUnit, setSizeUnit] = useState('');
   const [brand, setBrand] = useState('');
   const [purchaseLocation, setPurchaseLocation] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
@@ -149,15 +179,16 @@ export default function AddInventoryItemPage() {
           const match = /^([\d.,]+)\s*(.*)$/.exec(identification.data.quantity_text.trim());
 
           if (match) {
-            const parsedQuantity = match[1].replace(',', '.');
-            const parsedUnit = match[2].trim();
+            const parsedSize = match[1].replace(',', '.');
+            const parsedUnit = normalizeSizeUnit(match[2]);
 
-            if (!quantity.trim() && parsedQuantity) {
-              setQuantity(parsedQuantity);
+            // "454 g" describes one package, so it fills Size, not Quantity.
+            if (!size.trim() && parsedSize) {
+              setSize(parsedSize);
             }
 
-            if (!unit.trim() && parsedUnit) {
-              setUnit(parsedUnit);
+            if (!sizeUnit && parsedUnit) {
+              setSizeUnit(parsedUnit);
             }
           }
         }
@@ -216,11 +247,20 @@ export default function AddInventoryItemPage() {
       return;
     }
 
+    const parsedSize = size.trim() ? Number(size) : undefined;
+
+    if (parsedSize !== undefined && Number.isNaN(parsedSize)) {
+      setErrorMessage('Size must be a number');
+      setIsSubmitting(false);
+      return;
+    }
+
     const result = await addFridgeItem({
       name,
       category,
       quantity: parsedQuantity,
-      unit: unit.trim() || undefined,
+      size: parsedSize,
+      size_unit: sizeUnit || undefined,
       typical_shelf_life_days: identified?.typical_shelf_life_days,
       brand: brand.trim() || undefined,
       purchase_location: purchaseLocation.trim() || undefined,
@@ -291,7 +331,9 @@ export default function AddInventoryItemPage() {
               </label>
 
               <label className="block">
-                <span className="mb-3 block text-sm font-medium text-gray-900">Quantity</span>
+                <span className="mb-3 block text-sm font-medium text-gray-900">
+                  Quantity <span className="font-normal text-gray-500">(how many)</span>
+                </span>
                 <input
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   type="text"
@@ -303,16 +345,37 @@ export default function AddInventoryItemPage() {
               </label>
             </div>
 
-            <label className="block">
-              <span className="mb-3 block text-sm font-medium text-gray-900">Unit</span>
-              <input
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                type="text"
-                placeholder="e.g. pcs, kg, ml"
-                value={unit}
-                onChange={(event) => setUnit(event.target.value)}
-              />
-            </label>
+            <div className="grid gap-6 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-3 block text-sm font-medium text-gray-900">
+                  Size <span className="font-normal text-gray-500">(each)</span>
+                </span>
+                <input
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="500"
+                  value={size}
+                  onChange={(event) => setSize(event.target.value)}
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-3 block text-sm font-medium text-gray-900">Size unit</span>
+                <select
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  value={sizeUnit}
+                  onChange={(event) => setSizeUnit(event.target.value)}
+                >
+                  <option value="">Not specified</option>
+                  {SIZE_UNITS.map((option) => (
+                    <option key={option} value={option}>
+                      {option === 'other' ? 'Other' : option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
             <div>
               <button

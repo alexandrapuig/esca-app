@@ -8,6 +8,10 @@ import { getFridgeItems, updateFridgeItem, type FridgeItem } from '@/lib/api';
 
 const CATEGORIES = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverage', 'other'] as const;
 
+// Must match SIZE_UNITS in backend/src/services/fridgeService.ts. 'fl oz' is
+// volume and 'oz' is mass; they are not interchangeable.
+const SIZE_UNITS = ['g', 'kg', 'ml', 'l', 'oz', 'lb', 'fl oz', 'other'] as const;
+
 export default function EditInventoryItemPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
@@ -21,7 +25,8 @@ export default function EditInventoryItemPage() {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('other');
   const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState('');
+  const [size, setSize] = useState('');
+  const [sizeUnit, setSizeUnit] = useState('');
   const [purchaseDate, setPurchaseDate] = useState('');
   const [estimatedExpiry, setEstimatedExpiry] = useState('');
   const [brand, setBrand] = useState('');
@@ -60,7 +65,8 @@ export default function EditInventoryItemPage() {
           : 'other',
       );
       setQuantity(item.quantity !== null ? String(item.quantity) : '');
-      setUnit(item.unit ?? '');
+      setSize(item.size !== null ? String(item.size) : '');
+      setSizeUnit(item.sizeUnit ?? '');
       setPurchaseDate(item.purchaseDate ?? '');
       setEstimatedExpiry(item.estimatedExpiry ?? '');
       setBrand(item.brand ?? '');
@@ -95,6 +101,19 @@ export default function EditInventoryItemPage() {
       parsedQuantity = value;
     }
 
+    let parsedSize: number | null = null;
+
+    if (size.trim()) {
+      const value = Number(size);
+
+      if (Number.isNaN(value)) {
+        setErrorMessage('Size must be a number');
+        return;
+      }
+
+      parsedSize = value;
+    }
+
     let parsedPrice: number | null = null;
 
     if (purchasePrice.trim()) {
@@ -116,7 +135,8 @@ export default function EditInventoryItemPage() {
       name: name.trim(),
       category,
       quantity: parsedQuantity,
-      unit: unit.trim() || null,
+      size: parsedSize,
+      size_unit: sizeUnit || null,
       estimated_expiry: estimatedExpiry || null,
       purchase_date: purchaseDate || undefined,
       brand: brand.trim() || null,
@@ -227,14 +247,33 @@ export default function EditInventoryItemPage() {
               </label>
 
               <label className="block">
-                <span className="mb-3 block text-sm font-medium text-gray-900">Unit</span>
+                <span className="mb-3 block text-sm font-medium text-gray-900">
+                  Size <span className="font-normal text-gray-500">(each)</span>
+                </span>
                 <input
                   className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   type="text"
-                  placeholder="e.g. pcs, kg, ml"
-                  value={unit}
-                  onChange={(event) => setUnit(event.target.value)}
+                  inputMode="decimal"
+                  placeholder="500"
+                  value={size}
+                  onChange={(event) => setSize(event.target.value)}
                 />
+              </label>
+
+              <label className="block">
+                <span className="mb-3 block text-sm font-medium text-gray-900">Size unit</span>
+                <select
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  value={sizeUnit}
+                  onChange={(event) => setSizeUnit(event.target.value)}
+                >
+                  <option value="">Not specified</option>
+                  {SIZE_UNITS.map((option) => (
+                    <option key={option} value={option}>
+                      {option === 'other' ? 'Other' : option}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <label className="block">
