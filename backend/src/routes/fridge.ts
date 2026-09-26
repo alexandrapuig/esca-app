@@ -14,6 +14,9 @@ type CreateFridgeItemBody = {
   name?: string;
   category?: string;
   quantity?: number;
+  size?: number;
+  size_unit?: string;
+  /** @deprecated Older clients send a single quantity plus a free-text unit. */
   unit?: string;
   typical_shelf_life_days?: number;
   brand?: string;
@@ -29,6 +32,9 @@ type UpdateFridgeItemBody = {
   name?: string;
   category?: string;
   quantity?: number | null;
+  size?: number | null;
+  size_unit?: string | null;
+  /** @deprecated Older clients send a single quantity plus a free-text unit. */
   unit?: string | null;
   typical_shelf_life_days?: number | null;
   estimated_expiry?: string | null;
@@ -66,6 +72,8 @@ router.post('/items', async (req, res) => {
     name: string;
     category?: string;
     quantity?: number;
+    size?: number;
+    sizeUnit?: string;
     unit?: string;
     typicalShelfLifeDays?: number;
     brand?: string;
@@ -87,6 +95,14 @@ router.post('/items', async (req, res) => {
 
   if (typeof body.quantity === 'number') {
     createInput.quantity = body.quantity;
+  }
+
+  if (typeof body.size === 'number') {
+    createInput.size = body.size;
+  }
+
+  if (typeof body.size_unit === 'string') {
+    createInput.sizeUnit = body.size_unit;
   }
 
   if (typeof body.unit === 'string') {
@@ -153,8 +169,8 @@ router.post('/items', async (req, res) => {
       barcode: body.barcode,
       name: result.data.name,
       category: result.data.category ?? 'other',
-      quantityText: result.data.quantity
-        ? `${result.data.quantity}${result.data.unit ? ` ${result.data.unit}` : ''}`
+      quantityText: result.data.size
+        ? `${result.data.size}${result.data.sizeUnit ? ` ${result.data.sizeUnit}` : ''}`
         : null,
       brand: result.data.brand,
       typicalShelfLifeDays: result.data.typicalShelfLifeDays,
@@ -235,6 +251,14 @@ router.put('/items/:id', async (req, res) => {
     updateInput.quantity = body.quantity;
   }
 
+  if (body.size !== undefined) {
+    updateInput.size = body.size;
+  }
+
+  if (body.size_unit !== undefined) {
+    updateInput.sizeUnit = body.size_unit;
+  }
+
   if (body.unit !== undefined) {
     updateInput.unit = body.unit;
   }
@@ -300,8 +324,8 @@ router.put('/items/:id', async (req, res) => {
       barcode: result.data.barcode,
       name: result.data.name,
       category: result.data.category ?? 'other',
-      quantityText: result.data.quantity
-        ? `${result.data.quantity}${result.data.unit ? ` ${result.data.unit}` : ''}`
+      quantityText: result.data.size
+        ? `${result.data.size}${result.data.sizeUnit ? ` ${result.data.sizeUnit}` : ''}`
         : null,
       brand: result.data.brand,
       typicalShelfLifeDays: result.data.typicalShelfLifeDays,
