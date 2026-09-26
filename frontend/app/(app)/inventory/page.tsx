@@ -119,6 +119,15 @@ function riskFromDays(days: number | null, category: string | null): 'low' | 'me
   return days < high ? 'high' : days <= medium ? 'medium' : 'low';
 }
 
+type StatusFilter = 'active' | 'fresh' | 'expired' | 'consumed';
+
+const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: 'active', label: 'Active' },
+  { key: 'fresh', label: 'Fresh' },
+  { key: 'expired', label: 'Expired' },
+  { key: 'consumed', label: 'Consumed' },
+];
+
 function itemStatusStyles(status: FridgeItem['status']): string {
   if (status === 'consumed') {
     return 'bg-emerald-100 text-emerald-800';
@@ -135,6 +144,7 @@ function InventoryPageContent() {
   const [items, setItems] = useState<FridgeItem[]>([]);
   const [sortColumn, setSortColumn] = useState<SortColumn>('estimatedExpiry');
   const [sortAscending, setSortAscending] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [isLoading, setIsLoading] = useState(true);
   const [isPredicting, setIsPredicting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -220,6 +230,19 @@ function InventoryPageContent() {
   // Items with no prediction sort last on risk rather than counting as low,
   // since "not yet predicted" is not the same as "safe". Nulls sort last on
   // every column for the same reason.
+  // Consumed items are hidden by default: once something is eaten there is
+  // no reason for it to sit in the list of what you have. Expired stays in
+  // the default view because it is still in the fridge and still actionable.
+  const visibleItems = useMemo(() => {
+    if (statusFilter === 'active') {
+      return items.filter((item) => item.status === 'fresh' || item.status === 'expired');
+    }
+
+    return items.filter((item) => item.status === statusFilter);
+  }, [items, statusFilter]);
+
+  const hasVisibleItems = useMemo(() => visibleItems.length > 0, [visibleItems]);
+
   const sortedItems = useMemo(() => {
     const withRisk = (item: FridgeItem): number => {
       const risk = riskFromDays(daysUntilExpiry(item.estimatedExpiry), item.category);
@@ -239,7 +262,7 @@ function InventoryPageContent() {
       return typeof raw === 'string' ? raw.toLowerCase() : raw;
     };
 
-    return [...items].sort((first, second) => {
+    return [...visibleItems].sort((first, second) => {
       const a = value(first);
       const b = value(second);
 
@@ -257,7 +280,7 @@ function InventoryPageContent() {
 
       return (a < b ? -1 : 1) * (sortAscending ? 1 : -1);
     });
-  }, [items, predictions, sortColumn, sortAscending]);
+  }, [visibleItems, predictions, sortColumn, sortAscending]);
 
   function getPredictionForItem(itemId: string): SpoilagePrediction | null {
     return predictions.find((prediction) => prediction.item_id === itemId) ?? null;
@@ -375,11 +398,26 @@ function InventoryPageContent() {
 
         <section className="rounded-2xl border border-gray-200 p-6 md:p-8">
           <div className="flex flex-wrap items-center gap-3">
+            <label className="ml-auto">
+              <span className="sr-only">Filter by status</span>
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 transition hover:border-gray-400"
+              >
+                {STATUS_FILTERS.map(({ key, label }) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <button
               type="button"
               onClick={handleGeneratePredictions}
               disabled={isPredicting}
-              className="ml-auto rounded-lg bg-emerald-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-emerald-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPredicting ? 'Updating predictions...' : 'Update predictions'}
             </button>
@@ -405,7 +443,26 @@ function InventoryPageContent() {
             </div>
           ) : null}
 
-          {!isLoading && hasItems ? (
+          {!isLoading && hasItems && !hasVisibleItems ? (
+            <div className="mt-8 rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center">
+              <p className="font-serif text-2xl leading-snug text-gray-900">
+                {statusFilter === 'consumed'
+                  ? 'Nothing consumed yet'
+                  : statusFilter === 'expired'
+                    ? 'Nothing expired'
+                    : 'No items match this filter'}
+              </p>
+              <p className="mt-2 text-sm font-light text-gray-600">
+                {statusFilter === 'consumed'
+                  ? 'Items you mark as consumed will appear here.'
+                  : statusFilter === 'expired'
+                    ? 'Items past their expiry date will appear here.'
+                    : 'Try a different status filter.'}
+              </p>
+            </div>
+          ) : null}
+
+          {!isLoading && hasVisibleItems ? (
             <>
               <div className="hidden overflow-x-auto rounded-2xl border border-stone-200 md:block">
                 <table className="min-w-full divide-y divide-stone-200 text-left text-sm">
