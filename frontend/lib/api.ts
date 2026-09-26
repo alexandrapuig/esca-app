@@ -239,6 +239,22 @@ export async function deleteFridgeItem(id: string): Promise<ApiResult<{ deleted:
   };
 }
 
+/**
+ * Items within two days of expiry that have not been answered for today.
+ * Drives the dashboard review prompt.
+ */
+export async function getItemsForReview(): Promise<ApiResult<FridgeItem[]>> {
+  return apiRequest<FridgeItem[]>('/api/fridge/items/review', { method: 'GET' });
+}
+
+/** "Still have it" — keeps the item, silences the prompt for a day. */
+export async function markItemStillHave(id: string): Promise<ApiResult<FridgeItem>> {
+  return apiRequest<FridgeItem>(`/api/fridge/items/${id}/still-have`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 export async function getUserProfile(): Promise<ApiResult<UserProfile>> {
   return apiRequest<UserProfile>('/api/users/profile', { method: 'GET' });
 }

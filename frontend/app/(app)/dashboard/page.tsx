@@ -5,7 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { getCurrentUser } from '@/lib/supabase';
-import { getUserStats, type UserStats } from '@/lib/api';
+import {
+  getItemsForReview,
+  getUserStats,
+  markItemStillHave,
+  updateFridgeItemStatus,
+  type FridgeItem,
+  type UserStats,
+} from '@/lib/api';
 
 const STAT_CARDS: Array<{
   title: string;
@@ -24,6 +31,8 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [reviewItems, setReviewItems] = useState<FridgeItem[]>([]);
+  const [resolvingItemId, setResolvingItemId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -40,6 +49,12 @@ export default function DashboardPage() {
         if (statsResult.success) {
           setStats(statsResult.data);
         }
+
+        const reviewResult = await getItemsForReview();
+
+        if (reviewResult.success) {
+          setReviewItems(reviewResult.data);
+        }
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Unknown error');
         setErrorMessage(error.message);
@@ -50,6 +65,26 @@ export default function DashboardPage() {
 
     void loadDashboard();
   }, [router]);
+
+  // Each answer removes the item from the list rather than refetching: the
+  // list is small and already loaded, and a refetch would make the row jump.
+  async function handleReviewAction(itemId: string, action: 'consumed' | 'expired' | 'still-have') {
+    setResolvingItemId(itemId);
+
+    const result =
+      action === 'still-have'
+        ? await markItemStillHave(itemId)
+        : await updateFridgeItemStatus(itemId, action);
+
+    setResolvingItemId(null);
+
+    if (!result.success) {
+      setErrorMessage(result.error);
+      return;
+    }
+
+    setReviewItems((current) => current.filter((item) => item.id !== itemId));
+  }
 
   if (isLoading) {
     return (
@@ -77,6 +112,61 @@ export default function DashboardPage() {
 
         {errorMessage ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{errorMessage}</div>
+        ) : null}
+
+        {reviewItems.length > 0 ? (
+          <section className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-6 md:p-8">
+            <h2 className="font-serif text-2xl leading-snug text-gray-900">
+              {reviewItems.length === 1 ? 'One item needs a look' : `${reviewItems.length} items need a look`}
+            </h2>
+            <p className="mt-2 text-sm font-light text-gray-700">
+              These are close to their expiry date. Let us know what happened so your inventory stays accurate.
+            </p>
+
+            <ul className="mt-6 flex flex-col gap-3">
+              {reviewItems.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-white px-4 py-3"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">{item.name}</p>
+                    <p className="text-xs text-gray-500 capitalize">
+                      {item.category ?? 'other'}
+                      {item.estimatedExpiry ? ` · expires ${item.estimatedExpiry}` : ''}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={resolvingItemId === item.id}
+                      onClick={() => handleReviewAction(item.id, 'consumed')}
+                      className="rounded-full bg-emerald-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Ate it
+                    </button>
+                    <button
+                      type="button"
+                      disabled={resolvingItemId === item.id}
+                      onClick={() => handleReviewAction(item.id, 'expired')}
+                      className="rounded-full border border-gray-300 bg-white px-4 py-2 text-xs font-medium text-gray-700 transition hover:border-gray-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Threw it out
+                    </button>
+                    <button
+                      type="button"
+                      disabled={resolvingItemId === item.id}
+                      onClick={() => handleReviewAction(item.id, 'still-have')}
+                      className="rounded-full border border-gray-300 bg-white px-4 py-2 text-xs font-medium text-gray-700 transition hover:border-gray-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Still have it
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         {stats && stats.rescue_rate_percent !== null ? (
