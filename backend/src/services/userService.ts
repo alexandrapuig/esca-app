@@ -64,41 +64,59 @@ const CO2_PER_KG = 2.5;
  * else - "pieces", "cans", an empty unit - falls back to the category average,
  * because 2 of something says nothing about its weight.
  */
-function itemWeightKg(item: { category: string | null; quantity: number | null; unit: string | null }): number {
+/**
+ * kg per unit of size, for the fixed size_unit list only.
+ *
+ * 'fl oz' is deliberately separate from 'oz': one is volume, one is mass.
+ * Do not match these with includes() or a substring test -- 16.9 fl oz of
+ * olive oil is not 16.9 oz of anything.
+ *
+ * Volumes use a water equivalent, which is close for milk and juice and
+ * rough for everything else.
+ */
+const SIZE_UNIT_KG: Record<string, number> = {
+  g: 0.001,
+  kg: 1,
+  ml: 0.001,
+  l: 1,
+  oz: 0.02835,
+  lb: 0.4536,
+  'fl oz': 0.02957,
+};
+
+/**
+ * An item's total weight in kg: quantity (how many packages) times size
+ * (amount per package).
+ *
+ * Falls back to the category average when size or size_unit is missing, or
+ * when size_unit is 'other'. Quantity alone says nothing about weight -- 3
+ * bananas and 3 watermelons both have a size of null.
+ */
+function itemWeightKg(item: {
+  category: string | null;
+  quantity: number | null;
+  size: number | null;
+  size_unit: string | null;
+}): number {
   const fallback = CATEGORY_WEIGHTS_KG[item.category ?? 'other'] ?? 0.3;
 
-  if (typeof item.quantity !== 'number' || !Number.isFinite(item.quantity) || item.quantity <= 0) {
-    return fallback;
+  const quantity =
+    typeof item.quantity === 'number' && Number.isFinite(item.quantity) && item.quantity > 0
+      ? item.quantity
+      : 1;
+
+  if (typeof item.size !== 'number' || !Number.isFinite(item.size) || item.size <= 0) {
+    return fallback * quantity;
   }
 
-  const unit = (item.unit ?? '').trim().toLowerCase();
+  const sizeUnit = (item.size_unit ?? '').trim().toLowerCase();
+  const kgPerUnit = SIZE_UNIT_KG[sizeUnit];
 
-  if (unit === 'g' || unit === 'gram' || unit === 'grams') {
-    return item.quantity / 1000;
+  if (typeof kgPerUnit !== 'number') {
+    return fallback * quantity;
   }
 
-  if (unit === 'kg' || unit === 'kilogram' || unit === 'kilograms') {
-    return item.quantity;
-  }
-
-  // Water-equivalent for liquids. Close enough for milk and juice.
-  if (unit === 'ml' || unit === 'millilitre' || unit === 'millilitres') {
-    return item.quantity / 1000;
-  }
-
-  if (unit === 'l' || unit === 'litre' || unit === 'litres' || unit === 'liter' || unit === 'liters') {
-    return item.quantity;
-  }
-
-  if (unit === 'oz' || unit === 'ounce' || unit === 'ounces') {
-    return (item.quantity * 28.35) / 1000;
-  }
-
-  if (unit === 'lb' || unit === 'lbs' || unit === 'pound' || unit === 'pounds') {
-    return item.quantity * 0.4536;
-  }
-
-  return fallback;
+  return quantity * item.size * kgPerUnit;
 }
 
 type ServiceSuccess<T> = {
@@ -253,13 +271,14 @@ export async function getUserStats(householdId: string): Promise<ServiceResult<U
   // items while the inventory showed everyone's.
   const { data, error } = await supabase
     .from('fridge_items')
-    .select('status, category, quantity, unit, purchase_price')
+    .select('status, category, quantity, size, size_unit, purchase_price')
     .eq('household_id', householdId)
     .returns<{
       status: string;
       category: string | null;
       quantity: number | null;
-      unit: string | null;
+      size: number | null;
+      size_unit: string | null;
       purchase_price: number | null;
     }[]>();
 
