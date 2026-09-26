@@ -77,10 +77,16 @@ export async function generateRecipesForUser(params: {
 
     const { data: inventoryRows, error: inventoryError } = await supabase
       .from('fridge_items')
-      .select('name, category, quantity, unit')
+      .select('name, category, quantity, size, size_unit')
       .eq('household_id', params.householdId)
       .eq('status', 'fresh')
-      .returns<{ name: string; category: string | null; quantity: number | null; unit: string | null }[]>();
+      .returns<{
+        name: string;
+        category: string | null;
+        quantity: number | null;
+        size: number | null;
+        size_unit: string | null;
+      }[]>();
 
     // Inventory is the primary input now. A failed read must not silently
     // become an empty fridge -- Claude would mark every ingredient missing.
@@ -120,8 +126,13 @@ export async function generateRecipesForUser(params: {
         inventory: (inventoryRows ?? []).map((item) => ({
           item_name: item.name,
           category: item.category,
-          quantity: item.quantity,
-          unit: item.unit,
+          // Total amount, not per-package: two 400g tins is 800g, which is
+          // what decides whether a recipe needs more than you have.
+          quantity:
+            typeof item.size === 'number' && item.size > 0
+              ? item.size * (typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1)
+              : null,
+          unit: item.size_unit,
         })),
         history: (historyRows ?? []).map((row) => ({
           name: row.name,
