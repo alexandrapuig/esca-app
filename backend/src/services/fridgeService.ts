@@ -3,7 +3,69 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 const FRIDGE_ITEM_COLUMNS =
-  'id, user_id, name, category, quantity, unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at, brand, purchase_location, purchase_price, notes, barcode';
+  'id, user_id, name, category, quantity, unit, size, size_unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at, brand, purchase_location, purchase_price, notes, barcode';
+
+/**
+ * The fixed size_unit list. Volume and mass are kept separate on purpose:
+ * 'fl oz' is not 'oz'.
+ */
+export const SIZE_UNITS = ['g', 'kg', 'ml', 'l', 'oz', 'lb', 'fl oz', 'other'] as const;
+
+/** Free-text spellings accepted from older clients, mapped to the fixed list. */
+const SIZE_UNIT_ALIASES: Record<string, string> = {
+  g: 'g', gram: 'g', grams: 'g',
+  kg: 'kg', kilogram: 'kg', kilograms: 'kg',
+  ml: 'ml', millilitre: 'ml', millilitres: 'ml', milliliter: 'ml', milliliters: 'ml',
+  l: 'l', litre: 'l', litres: 'l', liter: 'l', liters: 'l',
+  oz: 'oz', ounce: 'oz', ounces: 'oz',
+  lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb',
+  'fl oz': 'fl oz', 'fluid ounce': 'fl oz', 'fluid ounces': 'fl oz',
+};
+
+/**
+ * Counting words that older clients sent as a unit. These are quantities,
+ * not sizes: "3 bananas" is quantity 3 with an unknown size.
+ */
+const COUNTING_WORDS = new Set([
+  'banana', 'bananas', 'piece', 'pieces', 'item', 'items',
+  'can', 'cans', 'carton', 'cartons', 'bunch', 'bunches',
+  'pack', 'packs', 'bag', 'bags', 'box', 'boxes',
+]);
+
+export function normalizeSizeUnit(value?: string | null): string | null {
+  const raw = (value ?? '').trim().toLowerCase();
+
+  if (!raw) {
+    return null;
+  }
+
+  return SIZE_UNIT_ALIASES[raw] ?? 'other';
+}
+
+/**
+ * Maps a legacy quantity/unit pair onto quantity/size/size_unit.
+ *
+ * Older clients send one number and a free-text unit, which conflates "how
+ * many" with "how much in each". A measure means one package of that size;
+ * a counting word means that many packages of unknown size.
+ */
+export function mapLegacyQuantityUnit(
+  quantity: number | null | undefined,
+  unit: string | null | undefined,
+): { quantity: number | null; size: number | null; size_unit: string | null } {
+  const raw = (unit ?? '').trim().toLowerCase();
+  const amount = typeof quantity === 'number' && Number.isFinite(quantity) ? quantity : null;
+
+  if (!raw) {
+    return { quantity: amount, size: null, size_unit: null };
+  }
+
+  if (COUNTING_WORDS.has(raw)) {
+    return { quantity: amount, size: null, size_unit: null };
+  }
+
+  return { quantity: 1, size: amount, size_unit: normalizeSizeUnit(raw) };
+}
 
 type FridgeStatus = 'fresh' | 'consumed' | 'expired';
 type FridgeCategory =
@@ -23,6 +85,9 @@ type FridgeItemRow = {
   name: string;
   category: string | null;
   quantity: number | null;
+  size: number | null;
+  size_unit: string | null;
+  /** @deprecated Still written for older clients. Nothing reads it. */
   unit: string | null;
   typical_shelf_life_days: number | null;
   purchase_date: string;
@@ -42,6 +107,9 @@ export type FridgeItem = {
   name: string;
   category: string | null;
   quantity: number | null;
+  size: number | null;
+  sizeUnit: string | null;
+  /** @deprecated Still returned for older clients. */
   unit: string | null;
   typicalShelfLifeDays: number | null;
   purchaseDate: string;
@@ -76,6 +144,8 @@ function mapFridgeItem(row: FridgeItemRow): FridgeItem {
     name: row.name,
     category: row.category,
     quantity: row.quantity,
+    size: row.size,
+    sizeUnit: row.size_unit,
     unit: row.unit,
     typicalShelfLifeDays: row.typical_shelf_life_days,
     purchaseDate: row.purchase_date,
@@ -133,6 +203,9 @@ export async function createFridgeItem(params: {
   name: string;
   category?: string;
   quantity?: number;
+  size?: number;
+  sizeUnit?: string;
+  /** @deprecated Older clients send a single quantity plus a free-text unit. */
   unit?: string;
   typicalShelfLifeDays?: number;
   brand?: string;
@@ -176,12 +249,25 @@ export async function createFridgeItem(params: {
       ? Math.round(params.purchasePrice * 100) / 100
       : null;
 
+  // New fields win when present; the legacy pair is only used on its own.
+  const sizing =
+    params.size !== undefined || params.sizeUnit !== undefined
+      ? {
+          quantity: params.quantity ?? 1,
+          size: typeof params.size === 'number' && Number.isFinite(params.size) ? params.size : null,
+          size_unit: normalizeSizeUnit(params.sizeUnit),
+        }
+      : mapLegacyQuantityUnit(params.quantity, params.unit);
+
   const row = {
     user_id: params.userId,
     household_id: params.householdId,
     name: params.name.trim(),
     category: normalizedCategory,
-    quantity: params.quantity ?? null,
+    quantity: sizing.quantity,
+    size: sizing.size,
+    size_unit: sizing.size_unit,
+    // Written for older clients still reading it. Nothing here reads it back.
     unit: params.unit?.trim() || null,
     typical_shelf_life_days: shelfLifeDays,
     purchase_date: purchaseDate.toISOString().slice(0, 10),
@@ -315,6 +401,9 @@ export async function updateFridgeItem(params: {
   name?: string;
   category?: string;
   quantity?: number | null;
+  size?: number | null;
+  sizeUnit?: string | null;
+  /** @deprecated Older clients send a single quantity plus a free-text unit. */
   unit?: string | null;
   typicalShelfLifeDays?: number | null;
   estimatedExpiry?: string | null;
@@ -347,12 +436,33 @@ export async function updateFridgeItem(params: {
     updates.category = normalizeCategory(params.category);
   }
 
+  const sendsNewSizing = params.size !== undefined || params.sizeUnit !== undefined;
+
   if (params.quantity !== undefined) {
     updates.quantity = params.quantity;
   }
 
+  if (params.size !== undefined) {
+    updates.size =
+      typeof params.size === 'number' && Number.isFinite(params.size) ? params.size : null;
+  }
+
+  if (params.sizeUnit !== undefined) {
+    updates.size_unit = normalizeSizeUnit(params.sizeUnit);
+  }
+
   if (params.unit !== undefined) {
+    // Still stored so older clients keep seeing something sensible.
     updates.unit = params.unit?.trim() || null;
+
+    // A legacy client sending only quantity + unit means the pair together:
+    // "12 ounces" is one package of 12 oz, not twelve of something.
+    if (!sendsNewSizing) {
+      const sizing = mapLegacyQuantityUnit(params.quantity, params.unit);
+      updates.quantity = sizing.quantity;
+      updates.size = sizing.size;
+      updates.size_unit = sizing.size_unit;
+    }
   }
 
   if (params.typicalShelfLifeDays !== undefined) {
