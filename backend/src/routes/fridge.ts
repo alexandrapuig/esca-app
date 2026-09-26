@@ -4,6 +4,8 @@ import {
   createFridgeItem,
   deleteFridgeItem,
   listFridgeItems,
+  listItemsForReconciliation,
+  markItemStillHave,
   updateFridgeItem,
 } from '../services/fridgeService';
 import { learnBarcode } from '../services/barcodeService';
@@ -212,6 +214,46 @@ router.get('/items', async (req, res) => {
     success: true,
     data: result.data,
   });
+});
+
+/**
+ * Items close to expiry that the user has not answered for today. Feeds the
+ * dashboard review prompt. Declared before /items/:id so "review" is not
+ * matched as an id.
+ */
+router.get('/items/review', async (req, res) => {
+  const request = getAuthenticatedRequest(req);
+
+  const result = await listItemsForReconciliation({
+    householdId: request.user.householdId,
+  });
+
+  if (!result.success) {
+    res.status(result.status).json({ success: false, error: result.error });
+    return;
+  }
+
+  res.status(200).json({ success: true, data: result.data });
+});
+
+/**
+ * "Still have it": the item stays fresh and visible, drops out of the review
+ * list for a day, and counts toward the three-prompt limit.
+ */
+router.post('/items/:id/still-have', async (req, res) => {
+  const request = getAuthenticatedRequest(req);
+
+  const result = await markItemStillHave({
+    householdId: request.user.householdId,
+    itemId: req.params.id,
+  });
+
+  if (!result.success) {
+    res.status(result.status).json({ success: false, error: result.error });
+    return;
+  }
+
+  res.status(200).json({ success: true, data: result.data });
 });
 
 router.put('/items/:id', async (req, res) => {

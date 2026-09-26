@@ -118,8 +118,17 @@ CREATE TABLE IF NOT EXISTS public.fridge_items (
   user_id                 uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   name                    text NOT NULL,
   category                text NOT NULL,
+  -- quantity is HOW MANY packages; size is how much is in each one.
+  -- Two 500g bags: quantity 2, size 500, size_unit 'g'. Total is the product
+  -- of the two, which is what stats and the recipe prompt use.
   quantity                numeric DEFAULT 1,
-  unit                    text DEFAULT 'pieces',
+  size                    numeric,
+  -- Fixed list: g, kg, ml, l, oz, lb, 'fl oz', 'other'. 'fl oz' is volume and
+  -- 'oz' is mass; they are not interchangeable.
+  size_unit               text,
+  -- DEPRECATED. Superseded by size/size_unit (Sept 2026). Still written for
+  -- older mobile clients, read by nothing. Drop once mobile is updated.
+  unit                    text,
   purchase_date           date,
   expiry_date             date,
   estimated_expiry        date,
@@ -133,7 +142,12 @@ CREATE TABLE IF NOT EXISTS public.fridge_items (
   purchase_price          numeric,
   notes                   text,
   household_id            uuid NOT NULL REFERENCES public.households(id) ON DELETE CASCADE,
-  barcode                 text
+  barcode                 text,
+  -- Expiry review prompt: items within 2 days of expiry are raised on the
+  -- dashboard once a day until answered, and stop after three "still have"
+  -- answers.
+  last_reconciled_at      timestamptz,
+  reconcile_prompt_count  integer NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_fridge_items_user_id

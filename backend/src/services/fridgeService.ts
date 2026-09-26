@@ -349,6 +349,109 @@ export async function listFridgeItems(params: {
   };
 }
 
+/** Days before expiry at which an item starts being flagged for review. */
+const RECONCILE_WINDOW_DAYS = 2;
+
+/** After this many "still have" answers, the item stops being raised. */
+const RECONCILE_MAX_PROMPTS = 3;
+
+/**
+ * Fresh items at or past RECONCILE_WINDOW_DAYS from expiry that the user has
+ * not answered for today.
+ *
+ * Items with no estimated_expiry are excluded: there is no date to ask about.
+ * Items answered "still have" three times are excluded too -- at some point
+ * repeating the question is nagging rather than helping.
+ */
+export async function listItemsForReconciliation(params: {
+  householdId: string;
+}): Promise<ServiceResult<FridgeItem[]>> {
+  let supabase: SupabaseClient;
+
+  try {
+    supabase = getSupabaseAdminClient();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Supabase is not configured';
+    return { success: false, status: 500, error: message };
+  }
+
+  const cutoffDate = new Date(Date.now() + RECONCILE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const askedSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('fridge_items')
+    .select(FRIDGE_ITEM_COLUMNS)
+    .eq('household_id', params.householdId)
+    .eq('status', 'fresh')
+    .not('estimated_expiry', 'is', null)
+    .lte('estimated_expiry', cutoffDate)
+    .lt('reconcile_prompt_count', RECONCILE_MAX_PROMPTS)
+    .or(`last_reconciled_at.is.null,last_reconciled_at.lt.${askedSince}`)
+    .order('estimated_expiry', { ascending: true })
+    .returns<FridgeItemRow[]>();
+
+  if (error || !data) {
+    return {
+      success: false,
+      status: 500,
+      error: 'Unable to fetch items for review',
+    };
+  }
+
+  return {
+    success: true,
+    data: data.map(mapFridgeItem),
+  };
+}
+
+/**
+ * Records a "still have" answer: the item stays fresh and visible, but drops
+ * out of the review list for a day, and counts toward the prompt limit.
+ */
+export async function markItemStillHave(params: {
+  householdId: string;
+  itemId: string;
+}): Promise<ServiceResult<FridgeItem>> {
+  let supabase: SupabaseClient;
+
+  try {
+    supabase = getSupabaseAdminClient();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Supabase is not configured';
+    return { success: false, status: 500, error: message };
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from('fridge_items')
+    .select('reconcile_prompt_count')
+    .eq('id', params.itemId)
+    .eq('household_id', params.householdId)
+    .single<{ reconcile_prompt_count: number | null }>();
+
+  if (existingError || !existing) {
+    return { success: false, status: 404, error: 'Item not found' };
+  }
+
+  const { data, error } = await supabase
+    .from('fridge_items')
+    .update({
+      last_reconciled_at: new Date().toISOString(),
+      reconcile_prompt_count: (existing.reconcile_prompt_count ?? 0) + 1,
+    })
+    .eq('id', params.itemId)
+    .eq('household_id', params.householdId)
+    .select(FRIDGE_ITEM_COLUMNS)
+    .single<FridgeItemRow>();
+
+  if (error || !data) {
+    return { success: false, status: 500, error: 'Unable to update item' };
+  }
+
+  return { success: true, data: mapFridgeItem(data) };
+}
+
 export async function updateFridgeItemStatus(params: {
   householdId: string;
   itemId: string;
