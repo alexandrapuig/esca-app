@@ -33,6 +33,9 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [reviewItems, setReviewItems] = useState<FridgeItem[]>([]);
   const [resolvingItemId, setResolvingItemId] = useState<string | null>(null);
+  // Dismissal is per page load and deliberately does not count toward the
+  // three-prompt limit: closing a modal is not an answer about the food.
+  const [reviewDismissed, setReviewDismissed] = useState(false);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -114,16 +117,36 @@ export default function DashboardPage() {
           <div className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{errorMessage}</div>
         ) : null}
 
-        {reviewItems.length > 0 ? (
-          <section className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-6 md:p-8">
-            <h2 className="font-serif text-2xl leading-snug text-gray-900">
-              {reviewItems.length === 1 ? 'One item needs a look' : `${reviewItems.length} items need a look`}
-            </h2>
-            <p className="mt-2 text-sm font-light text-gray-700">
-              These are close to their expiry date. Let us know what happened so your inventory stays accurate.
-            </p>
+        {reviewItems.length > 0 && !reviewDismissed ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 px-4 py-8"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-heading"
+            onClick={() => setReviewDismissed(true)}
+          >
+            <section
+              className="max-h-full w-full max-w-2xl overflow-y-auto rounded-2xl border-2 border-amber-200 bg-amber-50 p-6 md:p-8"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <h2 id="review-heading" className="font-serif text-2xl leading-snug text-gray-900">
+                  {reviewItems.length === 1 ? 'One item needs a look' : `${reviewItems.length} items need a look`}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setReviewDismissed(true)}
+                  aria-label="Close"
+                  className="rounded-full px-2 py-1 text-xl leading-none text-gray-500 transition hover:text-gray-900"
+                >
+                  &times;
+                </button>
+              </div>
+              <p className="mt-2 text-sm font-light text-gray-700">
+                These are close to their expiry date. Let us know what happened so your inventory stays accurate.
+              </p>
 
-            <ul className="mt-6 flex flex-col gap-3">
+              <ul className="mt-6 flex flex-col gap-3">
               {reviewItems.map((item) => (
                 <li
                   key={item.id}
@@ -164,9 +187,18 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 </li>
-              ))}
-            </ul>
-          </section>
+                ))}
+              </ul>
+
+              <button
+                type="button"
+                onClick={() => setReviewDismissed(true)}
+                className="mt-6 text-sm font-medium text-gray-600 underline transition hover:text-gray-900"
+              >
+                Not now
+              </button>
+            </section>
+          </div>
         ) : null}
 
         {stats && stats.rescue_rate_percent !== null ? (
