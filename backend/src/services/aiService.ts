@@ -347,3 +347,103 @@ dietary_tags MUST only contain values from this exact list, and only where the r
     };
   });
 }
+
+const IMAGE_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+const IMAGE_SIZE_UNITS = ['g', 'kg', 'ml', 'l', 'oz', 'lb', 'fl oz', 'other'];
+
+export type ItemImageIdentification = {
+  name: string | null;
+  category: string | null;
+  brand: string | null;
+  size: number | null;
+  size_unit: string | null;
+  printed_date: string | null;
+  printed_date_kind: 'expiry' | 'best_before' | 'use_by' | 'packed' | null;
+  typical_shelf_life_days: number | null;
+};
+
+function normalizeImageSizeUnit(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const raw = value.trim().toLowerCase();
+
+  return IMAGE_SIZE_UNITS.includes(raw) ? raw : null;
+}
+
+function normalizePrintedDate(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return null;
+  }
+
+  const parsed = new Date(value.trim() + 'T00:00:00Z');
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  const years = (parsed.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 365);
+
+  return years > -3 && years < 6 ? value.trim() : null;
+}
+
+export async function identifyItemFromImageWithClaude(params: {
+  image: string;
+  mediaType?: string;
+}): Promise<ItemImageIdentification | null> {
+  const mediaType =
+    params.mediaType && IMAGE_MEDIA_TYPES.includes(params.mediaType) ? params.mediaType : 'image/jpeg';
+
+  const output = await callClaude(
+    'You read a single grocery item from a photo of its packaging, label, or a screenshot of a product listing. Report only what is actually legible in the image. Do not use product knowledge to fill in a size, a brand, or a date you cannot read - a blurred weight panel means null, not your best guess at the usual size for that product. Every field is independently optional: a legible name with everything else null is a useful answer. Return strict JSON only, with these keys: name (string or null), category (one of produce|dairy|meat|seafood|bakery|frozen|pantry|beverage|other, or null), brand (string or null), size (number or null - the amount in ONE package, not a count of packages), size_unit (one of g|kg|ml|l|oz|lb|fl oz|other, or null - note fl oz is volume and oz is mass, never substitute one for the other; if the package is counted in pieces or bunches rather than measured, leave both size and size_unit null), printed_date (YYYY-MM-DD or null - transcribe a printed date only if you can read it in full; if the year is absent or any digit is uncertain, return null), printed_date_kind (one of expiry|best_before|use_by|packed, or null - what the label calls the date you read), typical_shelf_life_days (integer or null - this one may be inferred from the product type, as unopened shelf life from purchase). If the image does not show a single identifiable food item at all, return {"identified": false}.',
+    [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Identify this grocery item. Return JSON only.' },
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: params.image } },
+        ],
+      },
+    ],
+    700,
+  );
+
+  const parsed = JSON.parse(extractJsonFromText(output)) as Record<string, unknown> & { identified?: boolean };
+
+  if (parsed.identified === false) {
+    return null;
+  }
+
+  const size = typeof parsed.size === 'number' && Number.isFinite(parsed.size) && parsed.size > 0 ? parsed.size : null;
+  const sizeUnit = normalizeImageSizeUnit(parsed.size_unit);
+  const shelfLife =
+    typeof parsed.typical_shelf_life_days === 'number' && Number.isFinite(parsed.typical_shelf_life_days)
+      ? Math.max(1, Math.floor(parsed.typical_shelf_life_days))
+      : null;
+  const dateKind = parsed.printed_date_kind;
+
+  const result: ItemImageIdentification = {
+    name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : null,
+    category: typeof parsed.category === 'string' && parsed.category.trim() ? parsed.category.trim().toLowerCase() : null,
+    brand: typeof parsed.brand === 'string' && parsed.brand.trim() ? parsed.brand.trim() : null,
+    // A size without a unit is meaningless and a unit without a size is
+    // nothing to store, so they stand or fall together.
+    size: size !== null && sizeUnit !== null ? size : null,
+    size_unit: size !== null && sizeUnit !== null ? sizeUnit : null,
+    printed_date: normalizePrintedDate(parsed.printed_date),
+    printed_date_kind:
+      dateKind === 'expiry' || dateKind === 'best_before' || dateKind === 'use_by' || dateKind === 'packed'
+        ? dateKind
+        : null,
+    typical_shelf_life_days: shelfLife,
+  };
+
+  // Nothing legible is the same answer as an explicit decline.
+  if (!result.name && !result.size && !result.printed_date) {
+    return null;
+  }
+
+  return result;
+}
