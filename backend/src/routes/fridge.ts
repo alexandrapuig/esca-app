@@ -9,6 +9,7 @@ import {
   updateFridgeItem,
 } from '../services/fridgeService';
 import { learnBarcode } from '../services/barcodeService';
+import { identifyItemFromImage } from '../services/itemImageService';
 import { trackEvent } from '../services/analyticsService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
 
@@ -56,6 +57,49 @@ function getAuthenticatedRequest(req: Request): AuthenticatedRequest {
   return req as unknown as AuthenticatedRequest;
 }
 
+
+type IdentifyImageBody = {
+  image?: string;
+  media_type?: string;
+};
+
+/**
+ * Identifies an item from a photo and returns the reading only - it never
+ * creates anything. The user confirms in the add form and POST /items does
+ * the write, so a misread costs a correction rather than a stray row.
+ */
+router.post('/identify-image', async (req, res) => {
+  const body = req.body as IdentifyImageBody;
+
+  if (typeof body.image !== 'string' || !body.image.trim()) {
+    res.status(400).json({ success: false, error: 'An image is required' });
+    return;
+  }
+
+  const result = await identifyItemFromImage({
+    image: body.image,
+    ...(typeof body.media_type === 'string' ? { mediaType: body.media_type } : {}),
+  });
+
+  // Whether a photo resolves at all is the open question on this path, and
+  // which fields come back legible is what decides if it saves any typing.
+  void trackEvent({
+    eventName: 'item_image_identified',
+    properties: {
+      success: result.success,
+      category: result.success ? result.data.category : null,
+      had_size: result.success ? result.data.size !== null : null,
+      had_printed_date: result.success ? result.data.printed_date !== null : null,
+    },
+  });
+
+  if (!result.success) {
+    res.status(result.status).json({ success: false, error: result.error });
+    return;
+  }
+
+  res.status(200).json({ success: true, data: result.data });
+});
 router.post('/items', async (req, res) => {
   const body = req.body as CreateFridgeItemBody;
   const request = getAuthenticatedRequest(req);
