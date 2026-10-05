@@ -342,3 +342,24 @@ export async function updateRecipe(recipeId: string, input: { saved?: boolean; c
 export async function deleteAccount(): Promise<ApiResult<{ deleted: true }>> {
   return apiRequest<{ deleted: true }>('/api/users/account', { method: 'DELETE' });
 }
+
+export type ItemImageIdentification = {
+  name: string | null;
+  category: string | null;
+  brand: string | null;
+  size: number | null;
+  size_unit: string | null;
+  printed_date: string | null;
+  printed_date_kind: 'expiry' | 'best_before' | 'use_by' | 'packed' | null;
+  typical_shelf_life_days: number | null;
+};
+
+export async function identifyItemImage(input: {
+  image: string;
+  media_type?: string;
+}): Promise<ApiResult<ItemImageIdentification>> {
+  return apiRequest<ItemImageIdentification>('/api/fridge/identify-image', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
