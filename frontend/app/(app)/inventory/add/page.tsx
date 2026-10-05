@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 
-import { addFridgeItem, identifyBarcode, identifyItemImage, type BarcodeIdentification, type ItemImageIdentification } from '@/lib/api';
+import { addFridgeItem, identifyBarcode, identifyItemImage, type BarcodeIdentification, type ItemImageReading } from '@/lib/api';
 
 const CATEGORIES = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverage', 'other'] as const;
 
@@ -110,6 +110,12 @@ function captureVideoFrameBase64(video: HTMLVideoElement): string | null {
   return dataUrl.replace(/^data:image\/jpeg;base64,/, '');
 }
 
+type ReviewItem = ItemImageReading & {
+  /** Stable key for editing a row; readings carry no id of their own. */
+  rowId: string;
+  include: boolean;
+};
+
 export default function AddInventoryItemPage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -136,8 +142,10 @@ export default function AddInventoryItemPage() {
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [scanValue, setScanValue] = useState('');
   const [identified, setIdentified] = useState<BarcodeIdentification | null>(null);
-  const [photoReading, setPhotoReading] = useState<ItemImageIdentification | null>(null);
+  const [photoReading, setPhotoReading] = useState<ItemImageReading | null>(null);
   const [suggestedDate, setSuggestedDate] = useState('');
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [readingSourceKind, setReadingSourceKind] = useState<'physical_item' | 'listing' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -176,6 +184,43 @@ export default function AddInventoryItemPage() {
   }, [purchaseDate, identified, expiryEdited]);
 
 
+  function prefillFromReading(reading: ItemImageReading) {
+    // Same rule as the barcode path: fill only what the user has left empty.
+    // A photo should never overwrite something already typed.
+    if (!name.trim() && reading.name) {
+      setName(reading.name);
+    }
+
+    if (reading.category && CATEGORIES.includes(reading.category as (typeof CATEGORIES)[number])) {
+      setCategory(reading.category as (typeof CATEGORIES)[number]);
+    }
+
+    if (!brand.trim() && reading.brand) {
+      setBrand(reading.brand);
+    }
+
+    if (!quantity.trim() && reading.quantity !== null) {
+      setQuantity(String(reading.quantity));
+    }
+
+    // Size and size_unit arrive together or not at all - the backend drops
+    // one without the other, since an amount with no unit is meaningless.
+    if (!size.trim() && reading.size !== null) {
+      setSize(String(reading.size));
+    }
+
+    if (!sizeUnit && reading.size_unit) {
+      setSizeUnit(reading.size_unit);
+    }
+
+    // The date is offered, never applied. A misread date silently drives
+    // spoilage predictions and the expiry review modal, so it waits for a
+    // deliberate tap even though every other field prefills.
+    if (reading.printed_date) {
+      setSuggestedDate(reading.printed_date);
+    }
+  }
+
   async function handlePhotoSelected(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     // Reset immediately so picking the same file twice still fires onChange.
@@ -187,6 +232,8 @@ export default function AddInventoryItemPage() {
 
     setErrorMessage('');
     setSuggestedDate('');
+    setPhotoReading(null);
+    setReviewItems([]);
     setIsIdentifying(true);
 
     try {
@@ -198,44 +245,29 @@ export default function AddInventoryItemPage() {
         return;
       }
 
-      const reading = identification.data;
-      setPhotoReading(reading);
+      const { source_kind: sourceKind, items } = identification.data;
+      setReadingSourceKind(sourceKind);
 
-      // Same rule as the barcode path: fill only what the user has left
-      // empty. A photo should never overwrite something already typed.
-      if (!name.trim() && reading.name) {
-        setName(reading.name);
+      // One item fills the form directly; several open the review list, since
+      // a form with one name field has nowhere to put four readings.
+      if (items.length === 1 && items[0]) {
+        setPhotoReading(items[0]);
+        prefillFromReading(items[0]);
+        return;
       }
 
-      if (reading.category && CATEGORIES.includes(reading.category as (typeof CATEGORIES)[number])) {
-        setCategory(reading.category as (typeof CATEGORIES)[number]);
-      }
-
-      if (!brand.trim() && reading.brand) {
-        setBrand(reading.brand);
-      }
-
-      // Size and size_unit arrive together or not at all - the backend drops
-      // one without the other, since an amount with no unit is meaningless.
-      if (!size.trim() && reading.size !== null) {
-        setSize(String(reading.size));
-      }
-
-      if (!sizeUnit && reading.size_unit) {
-        setSizeUnit(reading.size_unit);
-      }
-
-      // The date is offered, never applied. A misread date silently drives
-      // spoilage predictions and the expiry review modal, so it waits for a
-      // deliberate tap even though every other field prefills.
-      if (reading.printed_date) {
-        setSuggestedDate(reading.printed_date);
-      }
+      setReviewItems(items.map((item, index) => ({ ...item, rowId: `${Date.now()}-${index}`, include: true })));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'That photo could not be read.');
     } finally {
       setIsIdentifying(false);
     }
+  }
+
+  function updateReviewItem(rowId: string, changes: Partial<ReviewItem>) {
+    setReviewItems((previous) =>
+      previous.map((item) => (item.rowId === rowId ? { ...item, ...changes } : item)),
+    );
   }
 
   function acceptSuggestedDate() {
@@ -248,6 +280,7 @@ export default function AddInventoryItemPage() {
     setExpiryEdited(true);
     setSuggestedDate('');
   }
+
   async function startScanning() {
     setErrorMessage('');
     setIsScanning(true);
@@ -340,6 +373,72 @@ export default function AddInventoryItemPage() {
   function stopScanning() {
     scannerRef.current?.reset();
     setIsScanning(false);
+  }
+
+  /**
+   * Inserts every ticked row by calling the existing create endpoint once per
+   * item. Sequential rather than parallel: a cart screenshot is a handful of
+   * rows, and a failure part-way through should leave a clear record of what
+   * landed rather than an unordered scatter.
+   *
+   * Partial success is kept rather than rolled back - the items that were
+   * added are real, and the user can retry the rest.
+   */
+  async function handleAddReviewed() {
+    const chosen = reviewItems.filter((item) => item.include);
+
+    if (chosen.length === 0) {
+      return;
+    }
+
+    setErrorMessage('');
+    setIsSubmitting(true);
+
+    const failed: string[] = [];
+    let added = 0;
+
+    for (const item of chosen) {
+      const itemName = (item.name ?? '').trim();
+
+      if (!itemName) {
+        failed.push('an unnamed row');
+        continue;
+      }
+
+      const result = await addFridgeItem({
+        name: itemName,
+        category: item.category ?? 'other',
+        quantity: item.quantity ?? undefined,
+        size: item.size ?? undefined,
+        size_unit: item.size_unit ?? undefined,
+        typical_shelf_life_days: item.typical_shelf_life_days ?? undefined,
+        brand: item.brand ?? undefined,
+        purchase_date: purchaseDate || undefined,
+        // Nothing here sets an expiry: a listing carries no date for the
+        // item in your fridge, and the backend computes one from shelf life.
+      });
+
+      if (result.success) {
+        added += 1;
+      } else {
+        failed.push(itemName);
+      }
+    }
+
+    setIsSubmitting(false);
+
+    if (failed.length > 0) {
+      // Drop the rows that landed so a retry does not add them twice.
+      setReviewItems((previous) => previous.filter((item) => failed.includes((item.name ?? '').trim())));
+      setErrorMessage(
+        `Added ${added} of ${chosen.length}. These could not be added: ${failed.join(', ')}. They are still listed above.`,
+      );
+      return;
+    }
+
+    setReviewItems([]);
+    router.push('/inventory?success=added');
+    router.refresh();
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -663,6 +762,139 @@ export default function AddInventoryItemPage() {
                     <p className="mt-2 text-xs text-emerald-800">
                       Check it against the package before using it - a misread date affects spoilage alerts.
                     </p>
+                  </div>
+                ) : null}
+
+                {reviewItems.length > 0 ? (
+                  <div className="mt-4 rounded-lg border border-gray-300 bg-white p-4">
+                    <p className="text-sm font-medium text-gray-900">
+                      {reviewItems.length} items read from that image
+                    </p>
+                    <p className="mt-1 text-xs font-light text-gray-600">
+                      Check each one before adding. Untick anything you do not want, and edit anything that came back
+                      wrong.
+                      {readingSourceKind === 'listing'
+                        ? ' No expiry dates were taken: a screenshot shows a picture of a product, not the one in your fridge.'
+                        : ''}
+                    </p>
+
+                    <div className="mt-4 space-y-3">
+                      {reviewItems.map((item) => (
+                        <div
+                          key={item.rowId}
+                          className={`rounded-lg border p-3 transition ${
+                            item.include ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50 opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={item.include}
+                              onChange={(event) => updateReviewItem(item.rowId, { include: event.target.checked })}
+                              className="mt-3 h-4 w-4 shrink-0 accent-emerald-900"
+                              aria-label={`Include ${item.name ?? 'this item'}`}
+                            />
+                            <div className="grid flex-1 gap-3 sm:grid-cols-2">
+                              <label className="block">
+                                <span className="mb-1 block text-xs font-medium text-gray-700">Name</span>
+                                <input
+                                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                  type="text"
+                                  value={item.name ?? ''}
+                                  onChange={(event) => updateReviewItem(item.rowId, { name: event.target.value })}
+                                />
+                              </label>
+
+                              <label className="block">
+                                <span className="mb-1 block text-xs font-medium text-gray-700">Category</span>
+                                <select
+                                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                  value={item.category ?? 'other'}
+                                  onChange={(event) => updateReviewItem(item.rowId, { category: event.target.value })}
+                                >
+                                  {CATEGORIES.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option[0].toUpperCase() + option.slice(1)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+
+                              <div className="grid grid-cols-3 gap-2 sm:col-span-2">
+                                <label className="block">
+                                  <span className="mb-1 block text-xs font-medium text-gray-700">Qty</span>
+                                  <input
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="1"
+                                    value={item.quantity ?? ''}
+                                    onChange={(event) =>
+                                      updateReviewItem(item.rowId, {
+                                        quantity: event.target.value.trim() ? Number(event.target.value) : null,
+                                      })
+                                    }
+                                  />
+                                </label>
+
+                                <label className="block">
+                                  <span className="mb-1 block text-xs font-medium text-gray-700">Size</span>
+                                  <input
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={item.size ?? ''}
+                                    onChange={(event) =>
+                                      updateReviewItem(item.rowId, {
+                                        size: event.target.value.trim() ? Number(event.target.value) : null,
+                                      })
+                                    }
+                                  />
+                                </label>
+
+                                <label className="block">
+                                  <span className="mb-1 block text-xs font-medium text-gray-700">Unit</span>
+                                  <select
+                                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                    value={item.size_unit ?? ''}
+                                    onChange={(event) =>
+                                      updateReviewItem(item.rowId, { size_unit: event.target.value || null })
+                                    }
+                                  >
+                                    <option value="">—</option>
+                                    {SIZE_UNITS.map((option) => (
+                                      <option key={option} value={option}>
+                                        {option === 'other' ? 'Other' : option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleAddReviewed}
+                        disabled={isSubmitting || reviewItems.every((item) => !item.include)}
+                        className="rounded-lg bg-emerald-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-gray-400"
+                      >
+                        {isSubmitting
+                          ? 'Adding...'
+                          : `Add ${reviewItems.filter((item) => item.include).length} items`}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReviewItems([])}
+                        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400"
+                      >
+                        Discard
+                      </button>
+                    </div>
                   </div>
                 ) : null}
               </div>
