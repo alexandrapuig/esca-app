@@ -50,6 +50,9 @@ function normalizeSizeUnit(value: string): string {
  */
 const MAX_IMAGE_EDGE = 1024;
 
+/** Each photo is its own Claude call; a cap keeps one picker action bounded. */
+const MAX_PHOTOS = 6;
+
 function normalizeImageFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -146,6 +149,7 @@ export default function AddInventoryItemPage() {
   const [suggestedDate, setSuggestedDate] = useState('');
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [readingSourceKind, setReadingSourceKind] = useState<'physical_item' | 'listing' | null>(null);
+  const [photoProgress, setPhotoProgress] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -222,11 +226,11 @@ export default function AddInventoryItemPage() {
   }
 
   async function handlePhotoSelected(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    // Reset immediately so picking the same file twice still fires onChange.
+    const files = Array.from(event.target.files ?? []);
+    // Reset immediately so picking the same files twice still fires onChange.
     event.target.value = '';
 
-    if (!file) {
+    if (files.length === 0) {
       return;
     }
 
@@ -234,33 +238,83 @@ export default function AddInventoryItemPage() {
     setSuggestedDate('');
     setPhotoReading(null);
     setReviewItems([]);
+
+    if (files.length > MAX_PHOTOS) {
+      setErrorMessage(`Up to ${MAX_PHOTOS} photos at a time. The first ${MAX_PHOTOS} were read.`);
+    }
+
+    const chosen = files.slice(0, MAX_PHOTOS);
     setIsIdentifying(true);
+    setPhotoProgress(chosen.length > 1 ? `Reading ${chosen.length} photos...` : '');
 
     try {
-      const image = await normalizeImageFile(file);
-      const identification = await identifyItemImage({ image, media_type: 'image/jpeg' });
+      // One Claude call per image, run together: wall-clock time stays near
+      // one image's cost. allSettled so a single bad file does not discard
+      // the readings from the others.
+      const settled = await Promise.allSettled(
+        chosen.map(async (file) => {
+          const image = await normalizeImageFile(file);
+          return identifyItemImage({ image, media_type: 'image/jpeg' });
+        }),
+      );
 
-      if (!identification.success) {
-        setErrorMessage(identification.error);
+      const collected: ReviewItem[] = [];
+      const failures: string[] = [];
+      let lastSourceKind: 'physical_item' | 'listing' | null = null;
+
+      settled.forEach((outcome, index) => {
+        if (outcome.status === 'rejected') {
+          failures.push(chosen[index]?.name ?? `photo ${index + 1}`);
+          return;
+        }
+
+        if (!outcome.value.success) {
+          failures.push(`${chosen[index]?.name ?? `photo ${index + 1}`}: ${outcome.value.error}`);
+          return;
+        }
+
+        lastSourceKind = outcome.value.data.source_kind;
+
+        outcome.value.data.items.forEach((item, itemIndex) => {
+          // Duplicates across overlapping screenshots are kept deliberately:
+          // a visible repeated row can be unticked, where a silent dedupe on
+          // a near-matching name would quietly drop something real.
+          collected.push({ ...item, rowId: `${index}-${itemIndex}-${Date.now()}`, include: true });
+        });
+      });
+
+      setReadingSourceKind(lastSourceKind);
+
+      if (collected.length === 0) {
+        setErrorMessage(
+          failures.length > 0
+            ? failures.join(' · ')
+            : 'No items could be read from those photos. Try a clearer shot, or fill the fields yourself.',
+        );
         return;
       }
 
-      const { source_kind: sourceKind, items } = identification.data;
-      setReadingSourceKind(sourceKind);
+      if (failures.length > 0) {
+        setErrorMessage(`Some photos could not be read: ${failures.join(' · ')}`);
+      }
 
-      // One item fills the form directly; several open the review list, since
-      // a form with one name field has nowhere to put four readings.
-      if (items.length === 1 && items[0]) {
-        setPhotoReading(items[0]);
-        prefillFromReading(items[0]);
+      // A single photo of a single item fills the form directly. Anything
+      // else goes to the review list, including one item across several
+      // photos - once there are multiple uploads the list is the clearer
+      // place to see what was found.
+      if (chosen.length === 1 && collected.length === 1 && collected[0]) {
+        const single = collected[0];
+        setPhotoReading(single);
+        prefillFromReading(single);
         return;
       }
 
-      setReviewItems(items.map((item, index) => ({ ...item, rowId: `${Date.now()}-${index}`, include: true })));
+      setReviewItems(collected);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'That photo could not be read.');
+      setErrorMessage(error instanceof Error ? error.message : 'Those photos could not be read.');
     } finally {
       setIsIdentifying(false);
+      setPhotoProgress('');
     }
   }
 
@@ -709,12 +763,13 @@ export default function AddInventoryItemPage() {
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     capture="environment"
                     className="hidden"
                     onChange={handlePhotoSelected}
                     disabled={isIdentifying}
                   />
-                  {isIdentifying ? 'Reading photo...' : 'Take or upload a photo'}
+                  {isIdentifying ? photoProgress || 'Reading photo...' : 'Take or upload photos'}
                 </label>
 
                 {photoReading ? (
