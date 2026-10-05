@@ -352,18 +352,6 @@ const IMAGE_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
 const IMAGE_SIZE_UNITS = ['g', 'kg', 'ml', 'l', 'oz', 'lb', 'fl oz', 'other'];
 
-export type ItemImageIdentification = {
-  name: string | null;
-  category: string | null;
-  brand: string | null;
-  size: number | null;
-  size_unit: string | null;
-  printed_date: string | null;
-  printed_date_kind: 'expiry' | 'best_before' | 'use_by' | 'packed' | null;
-  source_kind: 'physical_item' | 'listing';
-  typical_shelf_life_days: number | null;
-};
-
 function normalizeImageSizeUnit(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
@@ -397,6 +385,8 @@ export type ItemImageReading = {
   quantity: number | null;
   size: number | null;
   size_unit: string | null;
+  price: number | null;
+  unit_price: number | null;
   printed_date: string | null;
   printed_date_kind: 'expiry' | 'best_before' | 'use_by' | 'packed' | null;
   typical_shelf_life_days: number | null;
@@ -425,6 +415,14 @@ function readOneItem(raw: Record<string, unknown>): ItemImageReading | null {
     typeof raw.typical_shelf_life_days === 'number' && Number.isFinite(raw.typical_shelf_life_days)
       ? Math.max(1, Math.floor(raw.typical_shelf_life_days))
       : null;
+  const price =
+    typeof raw.price === 'number' && Number.isFinite(raw.price) && raw.price >= 0
+      ? Math.round(raw.price * 100) / 100
+      : null;
+  const unitPrice =
+    typeof raw.unit_price === 'number' && Number.isFinite(raw.unit_price) && raw.unit_price >= 0
+      ? Math.round(raw.unit_price * 100) / 100
+      : null;
   const dateKind = raw.printed_date_kind;
 
   return {
@@ -436,6 +434,8 @@ function readOneItem(raw: Record<string, unknown>): ItemImageReading | null {
     // nothing to store, so they stand or fall together.
     size: size !== null && sizeUnit !== null ? size : null,
     size_unit: size !== null && sizeUnit !== null ? sizeUnit : null,
+    price,
+    unit_price: unitPrice,
     printed_date: normalizePrintedDate(raw.printed_date),
     printed_date_kind:
       dateKind === 'expiry' || dateKind === 'best_before' || dateKind === 'use_by' || dateKind === 'packed'
@@ -453,7 +453,7 @@ export async function identifyItemsFromImageWithClaude(params: {
     params.mediaType && IMAGE_MEDIA_TYPES.includes(params.mediaType) ? params.mediaType : 'image/jpeg';
 
   const output = await callClaude(
-    'You read grocery items from an image. The image is either a photo of an actual item (its packaging, label, or the food itself) or a screenshot depicting products: a store page, shopping cart, order confirmation, receipt, or advertisement. Report only what is legible. Do not use product knowledge to fill in a size, brand, or date you cannot read - a blurred weight panel means null, not your best guess at the usual size. Return strict JSON only, an object with two keys: source_kind, and items (an array). source_kind is physical_item when the image shows the actual object in front of the camera, or listing when it depicts products rather than being them. A screenshot of a shopping cart is a listing even though it shows real products the user bought. A photo of an actual item has exactly one entry in items, even when several units of it are visible - three identical yogurt pots are one item. A listing has one entry per distinct product line, in the order they appear. Each entry in items is an object with: name (string or null), category (one of produce|dairy|meat|seafood|bakery|frozen|pantry|beverage|other, or null), brand (string or null), quantity (integer or null - how many packages of this product, which a cart line often states explicitly; null when not stated), size (number or null - the amount in ONE package, never a count of packages), size_unit (one of g|kg|ml|l|oz|lb|fl oz|other, or null - fl oz is volume and oz is mass, never substitute one for the other; when a package is counted in pieces or bunches rather than measured, leave size and size_unit null), printed_date (YYYY-MM-DD or null - only from a date physically printed on the item itself, and only if you can read it in full; if the year is absent or any digit is uncertain, return null), printed_date_kind (one of expiry|best_before|use_by|packed, or null), typical_shelf_life_days (integer or null - this one may be inferred from the product type, as unopened shelf life from purchase). Every field is independently optional: an entry with a legible name and everything else null is useful. Omit an entry entirely only if you cannot read a name for it. If the image shows no food items at all, return {"items": []}.',
+    'You read grocery items from an image. The image is either a photo of an actual item (its packaging, label, or the food itself) or a screenshot depicting products: a store page, shopping cart, order confirmation, receipt, or advertisement. Report only what is legible. Do not use product knowledge to fill in a size, brand, or date you cannot read - a blurred weight panel means null, not your best guess at the usual size. Return strict JSON only, an object with two keys: source_kind, and items (an array). source_kind is physical_item when the image shows the actual object in front of the camera, or listing when it depicts products rather than being them. A screenshot of a shopping cart is a listing even though it shows real products the user bought. A photo of an actual item has exactly one entry in items, even when several units of it are visible - three identical yogurt pots are one item. A listing has one entry per distinct product line, in the order they appear. Each entry in items is an object with: name (string or null), category (one of produce|dairy|meat|seafood|bakery|frozen|pantry|beverage|other, or null), brand (string or null), quantity (integer or null - how many packages of this product, which a cart line often states explicitly; null when not stated), size (number or null - the amount in ONE package, never a count of packages), size_unit (one of g|kg|ml|l|oz|lb|fl oz|other, or null - fl oz is volume and oz is mass, never substitute one for the other; when a package is counted in pieces or bunches rather than measured, leave size and size_unit null), price (number or null - the total paid for this line as printed, as a plain number without a currency symbol; null on a photo of a physical item, which carries no price), unit_price (number or null - a per-unit price ONLY where one is printed, such as a per-pound rate shown beside the line. Do not divide a line total by a quantity to produce one: report what is printed, never a figure you worked out), printed_date (YYYY-MM-DD or null - only from a date physically printed on the item itself, and only if you can read it in full; if the year is absent or any digit is uncertain, return null), printed_date_kind (one of expiry|best_before|use_by|packed, or null), typical_shelf_life_days (integer or null - this one may be inferred from the product type, as unopened shelf life from purchase). Every field is independently optional: an entry with a legible name and everything else null is useful. Omit an entry entirely only if you cannot read a name for it. If the image shows no food items at all, return {"items": []}.',
     [
       {
         role: 'user',

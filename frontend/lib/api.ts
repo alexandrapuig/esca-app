@@ -350,6 +350,8 @@ export type ItemImageReading = {
   quantity: number | null;
   size: number | null;
   size_unit: string | null;
+  price: number | null;
+  unit_price: number | null;
   printed_date: string | null;
   printed_date_kind: 'expiry' | 'best_before' | 'use_by' | 'packed' | null;
   typical_shelf_life_days: number | null;
