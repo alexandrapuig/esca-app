@@ -25,6 +25,7 @@ type CreateFridgeItemBody = {
   brand?: string;
   purchase_location?: string;
   purchase_price?: number;
+  unit_price?: number;
   notes?: string;
   purchase_date?: string;
   barcode?: string;
@@ -46,6 +47,7 @@ type UpdateFridgeItemBody = {
   brand?: string | null;
   purchase_location?: string | null;
   purchase_price?: number | null;
+  unit_price?: number | null;
   notes?: string | null;
 };
 
@@ -128,6 +130,7 @@ router.post('/items', async (req, res) => {
     brand?: string;
     purchaseLocation?: string;
     purchasePrice?: number;
+    unitPrice?: number;
     notes?: string;
     purchaseDate?: string;
     barcode?: string;
@@ -172,6 +175,10 @@ router.post('/items', async (req, res) => {
 
   if (typeof body.purchase_price === 'number') {
     createInput.purchasePrice = body.purchase_price;
+  }
+
+  if (typeof body.unit_price === 'number') {
+    createInput.unitPrice = body.unit_price;
   }
 
   if (typeof body.notes === 'string') {
@@ -378,6 +385,10 @@ router.put('/items/:id', async (req, res) => {
 
   if (body.purchase_price !== undefined) {
     updateInput.purchasePrice = body.purchase_price;
+  }
+
+  if (body.unit_price !== undefined) {
+    updateInput.unitPrice = body.unit_price;
   }
 
   if (body.notes !== undefined) {

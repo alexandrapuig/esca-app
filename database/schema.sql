@@ -139,7 +139,11 @@ CREATE TABLE IF NOT EXISTS public.fridge_items (
   updated_at              timestamptz DEFAULT now(),
   brand                   text,
   purchase_location       text,
+  -- Line total: what was paid for this row. This is the figure stats use.
   purchase_price          numeric,
+  -- Price per one size_unit, or per package when size_unit is null.
+  -- Read from an order screenshot; not yet used by stats.
+  unit_price              numeric,
   notes                   text,
   household_id            uuid NOT NULL REFERENCES public.households(id) ON DELETE CASCADE,
   barcode                 text,

@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 const FRIDGE_ITEM_COLUMNS =
-  'id, user_id, name, category, quantity, unit, size, size_unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at, brand, purchase_location, purchase_price, notes, barcode';
+  'id, user_id, name, category, quantity, unit, size, size_unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at, brand, purchase_location, purchase_price, unit_price, notes, barcode';
 
 /**
  * The fixed size_unit list. Volume and mass are kept separate on purpose:
@@ -97,6 +97,7 @@ type FridgeItemRow = {
   brand: string | null;
   purchase_location: string | null;
   purchase_price: number | null;
+  unit_price: number | null;
   notes: string | null;
   barcode: string | null;
 };
@@ -119,6 +120,7 @@ export type FridgeItem = {
   brand: string | null;
   purchaseLocation: string | null;
   purchasePrice: number | null;
+  unitPrice: number | null;
   notes: string | null;
   barcode: string | null;
 };
@@ -155,6 +157,7 @@ function mapFridgeItem(row: FridgeItemRow): FridgeItem {
     brand: row.brand,
     purchaseLocation: row.purchase_location,
     purchasePrice: row.purchase_price,
+    unitPrice: row.unit_price,
     notes: row.notes,
     barcode: row.barcode,
   };
@@ -211,6 +214,7 @@ export async function createFridgeItem(params: {
   brand?: string;
   purchaseLocation?: string;
   purchasePrice?: number;
+  unitPrice?: number;
   notes?: string;
   purchaseDate?: string;
   barcode?: string;
@@ -249,6 +253,13 @@ export async function createFridgeItem(params: {
       ? Math.round(params.purchasePrice * 100) / 100
       : null;
 
+  // Per one size_unit, or per package when size_unit is null. Stored only;
+  // stats read purchase_price, which is the line total.
+  const normalizedUnitPrice =
+    typeof params.unitPrice === 'number' && Number.isFinite(params.unitPrice) && params.unitPrice >= 0
+      ? Math.round(params.unitPrice * 100) / 100
+      : null;
+
   // New fields win when present; the legacy pair is only used on its own.
   const sizing =
     params.size !== undefined || params.sizeUnit !== undefined
@@ -281,6 +292,7 @@ export async function createFridgeItem(params: {
     brand: params.brand?.trim() || null,
     purchase_location: params.purchaseLocation?.trim() || null,
     purchase_price: normalizedPrice,
+    unit_price: normalizedUnitPrice,
     notes: params.notes?.trim() || null,
     barcode: params.barcode?.trim() || null,
   };
@@ -515,6 +527,7 @@ export async function updateFridgeItem(params: {
   brand?: string | null;
   purchaseLocation?: string | null;
   purchasePrice?: number | null;
+  unitPrice?: number | null;
   notes?: string | null;
 }): Promise<ServiceResult<FridgeItem>> {
   let supabase: SupabaseClient;
@@ -601,6 +614,13 @@ export async function updateFridgeItem(params: {
       Number.isFinite(params.purchasePrice) &&
       params.purchasePrice >= 0
         ? Math.round(params.purchasePrice * 100) / 100
+        : null;
+  }
+
+  if (params.unitPrice !== undefined) {
+    updates.unit_price =
+      typeof params.unitPrice === 'number' && Number.isFinite(params.unitPrice) && params.unitPrice >= 0
+        ? Math.round(params.unitPrice * 100) / 100
         : null;
   }
 
