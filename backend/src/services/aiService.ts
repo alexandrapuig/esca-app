@@ -390,62 +390,99 @@ function normalizePrintedDate(value: unknown): string | null {
   return years > -3 && years < 6 ? value.trim() : null;
 }
 
-export async function identifyItemFromImageWithClaude(params: {
-  image: string;
-  mediaType?: string;
-}): Promise<ItemImageIdentification | null> {
-  const mediaType =
-    params.mediaType && IMAGE_MEDIA_TYPES.includes(params.mediaType) ? params.mediaType : 'image/jpeg';
+export type ItemImageReading = {
+  name: string | null;
+  category: string | null;
+  brand: string | null;
+  quantity: number | null;
+  size: number | null;
+  size_unit: string | null;
+  printed_date: string | null;
+  printed_date_kind: 'expiry' | 'best_before' | 'use_by' | 'packed' | null;
+  typical_shelf_life_days: number | null;
+};
 
-  const output = await callClaude(
-    'You read a single grocery item from a photo of its packaging, label, or a screenshot of a product listing. Report only what is actually legible in the image. Do not use product knowledge to fill in a size, a brand, or a date you cannot read - a blurred weight panel means null, not your best guess at the usual size for that product. Every field is independently optional: a legible name with everything else null is a useful answer. Return strict JSON only, with these keys: name (string or null), category (one of produce|dairy|meat|seafood|bakery|frozen|pantry|beverage|other, or null), brand (string or null), size (number or null - the amount in ONE package, not a count of packages), size_unit (one of g|kg|ml|l|oz|lb|fl oz|other, or null - note fl oz is volume and oz is mass, never substitute one for the other; if the package is counted in pieces or bunches rather than measured, leave both size and size_unit null), printed_date (YYYY-MM-DD or null - transcribe a printed date only if you can read it in full; if the year is absent or any digit is uncertain, return null), printed_date_kind (one of expiry|best_before|use_by|packed, or null - what the label calls the date you read), source_kind (one of physical_item|listing) - physical_item when the photo shows the actual object in front of the camera: packaging, a label, produce on a counter. listing when the image is a screenshot or capture of something depicting a product rather than the product itself: a store page, a cart, an order confirmation, a receipt, a printed advertisement. A screenshot of a shopping cart is a listing even though it shows real products the user bought. typical_shelf_life_days (integer or null - this one may be inferred from the product type, as unopened shelf life from purchase). If the image does not show a single identifiable food item at all, return {"identified": false}.',
-    [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: 'Identify this grocery item. Return JSON only.' },
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: params.image } },
-        ],
-      },
-    ],
-    700,
-  );
+export type ItemImageReadingSet = {
+  source_kind: 'physical_item' | 'listing';
+  items: ItemImageReading[];
+};
 
-  const parsed = JSON.parse(extractJsonFromText(output)) as Record<string, unknown> & { identified?: boolean };
+function readOneItem(raw: Record<string, unknown>): ItemImageReading | null {
+  const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : null;
 
-  if (parsed.identified === false) {
+  // A nameless entry is not an item anyone can act on.
+  if (!name) {
     return null;
   }
 
-  const size = typeof parsed.size === 'number' && Number.isFinite(parsed.size) && parsed.size > 0 ? parsed.size : null;
-  const sizeUnit = normalizeImageSizeUnit(parsed.size_unit);
-  const shelfLife =
-    typeof parsed.typical_shelf_life_days === 'number' && Number.isFinite(parsed.typical_shelf_life_days)
-      ? Math.max(1, Math.floor(parsed.typical_shelf_life_days))
+  const size = typeof raw.size === 'number' && Number.isFinite(raw.size) && raw.size > 0 ? raw.size : null;
+  const sizeUnit = normalizeImageSizeUnit(raw.size_unit);
+  const quantity =
+    typeof raw.quantity === 'number' && Number.isFinite(raw.quantity) && raw.quantity > 0
+      ? Math.floor(raw.quantity)
       : null;
-  const dateKind = parsed.printed_date_kind;
+  const shelfLife =
+    typeof raw.typical_shelf_life_days === 'number' && Number.isFinite(raw.typical_shelf_life_days)
+      ? Math.max(1, Math.floor(raw.typical_shelf_life_days))
+      : null;
+  const dateKind = raw.printed_date_kind;
 
-  const result: ItemImageIdentification = {
-    name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : null,
-    category: typeof parsed.category === 'string' && parsed.category.trim() ? parsed.category.trim().toLowerCase() : null,
-    brand: typeof parsed.brand === 'string' && parsed.brand.trim() ? parsed.brand.trim() : null,
+  return {
+    name,
+    category: typeof raw.category === 'string' && raw.category.trim() ? raw.category.trim().toLowerCase() : null,
+    brand: typeof raw.brand === 'string' && raw.brand.trim() ? raw.brand.trim() : null,
+    quantity,
     // A size without a unit is meaningless and a unit without a size is
     // nothing to store, so they stand or fall together.
     size: size !== null && sizeUnit !== null ? size : null,
     size_unit: size !== null && sizeUnit !== null ? sizeUnit : null,
-    printed_date: normalizePrintedDate(parsed.printed_date),
-    source_kind: parsed.source_kind === 'listing' ? 'listing' : 'physical_item',
+    printed_date: normalizePrintedDate(raw.printed_date),
     printed_date_kind:
       dateKind === 'expiry' || dateKind === 'best_before' || dateKind === 'use_by' || dateKind === 'packed'
         ? dateKind
         : null,
     typical_shelf_life_days: shelfLife,
   };
+}
 
-  // Nothing legible is the same answer as an explicit decline.
-  if (!result.name && !result.size && !result.printed_date) {
-    return null;
-  }
+export async function identifyItemsFromImageWithClaude(params: {
+  image: string;
+  mediaType?: string;
+}): Promise<ItemImageReadingSet> {
+  const mediaType =
+    params.mediaType && IMAGE_MEDIA_TYPES.includes(params.mediaType) ? params.mediaType : 'image/jpeg';
 
-  return result;
+  const output = await callClaude(
+    'You read grocery items from an image. The image is either a photo of an actual item (its packaging, label, or the food itself) or a screenshot depicting products: a store page, shopping cart, order confirmation, receipt, or advertisement. Report only what is legible. Do not use product knowledge to fill in a size, brand, or date you cannot read - a blurred weight panel means null, not your best guess at the usual size. Return strict JSON only, an object with two keys: source_kind, and items (an array). source_kind is physical_item when the image shows the actual object in front of the camera, or listing when it depicts products rather than being them. A screenshot of a shopping cart is a listing even though it shows real products the user bought. A photo of an actual item has exactly one entry in items, even when several units of it are visible - three identical yogurt pots are one item. A listing has one entry per distinct product line, in the order they appear. Each entry in items is an object with: name (string or null), category (one of produce|dairy|meat|seafood|bakery|frozen|pantry|beverage|other, or null), brand (string or null), quantity (integer or null - how many packages of this product, which a cart line often states explicitly; null when not stated), size (number or null - the amount in ONE package, never a count of packages), size_unit (one of g|kg|ml|l|oz|lb|fl oz|other, or null - fl oz is volume and oz is mass, never substitute one for the other; when a package is counted in pieces or bunches rather than measured, leave size and size_unit null), printed_date (YYYY-MM-DD or null - only from a date physically printed on the item itself, and only if you can read it in full; if the year is absent or any digit is uncertain, return null), printed_date_kind (one of expiry|best_before|use_by|packed, or null), typical_shelf_life_days (integer or null - this one may be inferred from the product type, as unopened shelf life from purchase). Every field is independently optional: an entry with a legible name and everything else null is useful. Omit an entry entirely only if you cannot read a name for it. If the image shows no food items at all, return {"items": []}.',
+    [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Identify the grocery items in this image. Return JSON only.' },
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: params.image } },
+        ],
+      },
+    ],
+    2000,
+  );
+
+  const parsed = JSON.parse(extractJsonFromText(output)) as {
+    source_kind?: unknown;
+    items?: unknown;
+  };
+
+  const items = Array.isArray(parsed.items)
+    ? parsed.items
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+        .map(readOneItem)
+        .filter((entry): entry is ItemImageReading => entry !== null)
+    : [];
+
+  return {
+    // physical_item is the conservative default: it is the reading that keeps
+    // a printed date, and a date is only dropped when we are sure it came
+    // from a depiction rather than the object itself.
+    source_kind: parsed.source_kind === 'listing' ? 'listing' : 'physical_item',
+    items,
+  };
 }

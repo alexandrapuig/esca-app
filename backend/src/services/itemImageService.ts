@@ -1,4 +1,4 @@
-import { identifyItemFromImageWithClaude, type ItemImageIdentification } from './aiService';
+import { identifyItemsFromImageWithClaude, type ItemImageReading, type ItemImageReadingSet } from './aiService';
 
 /**
  * Identifies a single grocery item from a photo of its packaging or a
@@ -21,7 +21,7 @@ const ACCEPTED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gi
 const MAX_IMAGE_BASE64_LENGTH = 3_500_000;
 
 export type ItemImageResult =
-  | { success: true; data: ItemImageIdentification }
+  | { success: true; data: ItemImageReadingSet }
   | { success: false; status: number; error: string };
 
 /**
@@ -41,7 +41,7 @@ function splitImageInput(image: string, declaredMediaType?: string): { data: str
   };
 }
 
-export async function identifyItemFromImage(params: {
+export async function identifyItemsFromImage(params: {
   image: string;
   mediaType?: string;
 }): Promise<ItemImageResult> {
@@ -72,39 +72,37 @@ export async function identifyItemFromImage(params: {
   }
 
   try {
-    const identified = await identifyItemFromImageWithClaude({ image: data, mediaType });
+    const reading = await identifyItemsFromImageWithClaude({ image: data, mediaType });
 
-    if (!identified) {
-      // A legible photo of something unidentifiable, or nothing legible at
-      // all. Leaving the form blank beats a confident wrong prefill, which is
-      // more work to correct than an empty field is to fill.
+    if (reading.items.length === 0) {
+      // Nothing legible, or a photo of something that is not food. Leaving
+      // the form blank beats a confident wrong prefill, which is more work to
+      // correct than an empty field is to fill.
       return {
         success: false,
         status: 404,
-        error: 'Nothing readable in that photo. Try a clearer shot of the label, or fill the fields yourself.',
+        error: 'No items could be read from that image. Try a clearer shot, or fill the fields yourself.',
       };
     }
 
-    // Claude is told the nine categories but a stray value would land in the
-    // form as an unselectable option, so an unrecognised one becomes null and
-    // the dropdown keeps its default.
-    const category = identified.category && CATEGORIES.includes(identified.category) ? identified.category : null;
+    // A listing shows a depiction of a product, not the carton in the user's
+    // fridge: a date on a store page or a cart screenshot belongs to the
+    // order or to a stock photo, never to the item being added. Dropped here
+    // rather than in the UI so it cannot reach the client at all.
+    const isListing = reading.source_kind === 'listing';
 
-    // A listing shows a depiction of a product, not the carton in the
-    // user's fridge: a date on a store page or a cart screenshot belongs to
-    // the order or to a stock photo, never to the item being added. Dropped
-    // here rather than in the UI so it cannot reach the client at all.
-    const isListing = identified.source_kind === 'listing';
+    const items: ItemImageReading[] = reading.items.map((item) => ({
+      ...item,
+      // Claude is told the nine categories but a stray value would land in
+      // the form as an unselectable option, so an unrecognised one becomes
+      // null and the dropdown keeps its default.
+      category: item.category && CATEGORIES.includes(item.category) ? item.category : null,
+      printed_date: isListing ? null : item.printed_date,
+      printed_date_kind: isListing ? null : item.printed_date_kind,
+    }));
 
-    return {
-      success: true,
-      data: {
-        ...identified,
-        category,
-        printed_date: isListing ? null : identified.printed_date,
-        printed_date_kind: isListing ? null : identified.printed_date_kind,
-      },
-    };
+    return { success: true, data: { source_kind: reading.source_kind, items } };
+
   } catch (error) {
     console.error('identifyItemFromImageWithClaude failed', error);
 

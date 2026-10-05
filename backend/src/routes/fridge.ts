@@ -9,7 +9,7 @@ import {
   updateFridgeItem,
 } from '../services/fridgeService';
 import { learnBarcode } from '../services/barcodeService';
-import { identifyItemFromImage } from '../services/itemImageService';
+import { identifyItemsFromImage } from '../services/itemImageService';
 import { trackEvent } from '../services/analyticsService';
 import { requireAuth, type AuthenticatedRequest } from '../utils/auth';
 
@@ -76,7 +76,7 @@ router.post('/identify-image', async (req, res) => {
     return;
   }
 
-  const result = await identifyItemFromImage({
+  const result = await identifyItemsFromImage({
     image: body.image,
     ...(typeof body.media_type === 'string' ? { mediaType: body.media_type } : {}),
   });
@@ -87,9 +87,12 @@ router.post('/identify-image', async (req, res) => {
     eventName: 'item_image_identified',
     properties: {
       success: result.success,
-      category: result.success ? result.data.category : null,
-      had_size: result.success ? result.data.size !== null : null,
-      had_printed_date: result.success ? result.data.printed_date !== null : null,
+      source_kind: result.success ? result.data.source_kind : null,
+      item_count: result.success ? result.data.items.length : 0,
+      // Whether a reading saves any typing comes down to how much of each
+      // entry came back legible, not just whether the call succeeded.
+      named_with_size: result.success ? result.data.items.filter((item) => item.size !== null).length : 0,
+      named_with_date: result.success ? result.data.items.filter((item) => item.printed_date !== null).length : 0,
     },
   });
 
