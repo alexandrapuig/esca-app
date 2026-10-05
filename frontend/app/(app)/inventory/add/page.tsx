@@ -3,9 +3,9 @@
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 
-import { addFridgeItem, identifyBarcode, type BarcodeIdentification } from '@/lib/api';
+import { addFridgeItem, identifyBarcode, identifyItemImage, type BarcodeIdentification, type ItemImageIdentification } from '@/lib/api';
 
 const CATEGORIES = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverage', 'other'] as const;
 
@@ -38,6 +38,58 @@ function normalizeSizeUnit(value: string): string {
   return SIZE_UNIT_ALIASES[raw] ?? '';
 }
 
+
+/**
+ * Draws a chosen file onto a canvas and re-exports it as JPEG, capped at
+ * MAX_IMAGE_EDGE on its longest side.
+ *
+ * This does two jobs at once. A phone photo is several megabytes and base64
+ * inflates it by a third, which overruns the serverless request body limit
+ * before the backend ever sees it. And re-encoding settles the media type:
+ * a PNG screenshot would otherwise be sent under a JPEG label.
+ */
+const MAX_IMAGE_EDGE = 1024;
+
+function normalizeImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      const longestEdge = Math.max(image.naturalWidth, image.naturalHeight);
+
+      if (!longestEdge) {
+        reject(new Error('That file could not be read as an image.'));
+        return;
+      }
+
+      const scale = longestEdge > MAX_IMAGE_EDGE ? MAX_IMAGE_EDGE / longestEdge : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(image.naturalWidth * scale);
+      canvas.height = Math.round(image.naturalHeight * scale);
+
+      const context = canvas.getContext('2d');
+
+      if (!context) {
+        reject(new Error('That file could not be read as an image.'));
+        return;
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      resolve(dataUrl.replace(/^data:image\/jpeg;base64,/, ''));
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('That file could not be read as an image.'));
+    };
+
+    image.src = objectUrl;
+  });
+}
 function captureVideoFrameBase64(video: HTMLVideoElement): string | null {
   if (!video.videoWidth || !video.videoHeight) {
     return null;
@@ -84,6 +136,8 @@ export default function AddInventoryItemPage() {
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [scanValue, setScanValue] = useState('');
   const [identified, setIdentified] = useState<BarcodeIdentification | null>(null);
+  const [photoReading, setPhotoReading] = useState<ItemImageIdentification | null>(null);
+  const [suggestedDate, setSuggestedDate] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -121,6 +175,79 @@ export default function AddInventoryItemPage() {
     setEstimatedExpiry(computed.toLocaleDateString('en-CA'));
   }, [purchaseDate, identified, expiryEdited]);
 
+
+  async function handlePhotoSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset immediately so picking the same file twice still fires onChange.
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    setErrorMessage('');
+    setSuggestedDate('');
+    setIsIdentifying(true);
+
+    try {
+      const image = await normalizeImageFile(file);
+      const identification = await identifyItemImage({ image, media_type: 'image/jpeg' });
+
+      if (!identification.success) {
+        setErrorMessage(identification.error);
+        return;
+      }
+
+      const reading = identification.data;
+      setPhotoReading(reading);
+
+      // Same rule as the barcode path: fill only what the user has left
+      // empty. A photo should never overwrite something already typed.
+      if (!name.trim() && reading.name) {
+        setName(reading.name);
+      }
+
+      if (reading.category && CATEGORIES.includes(reading.category as (typeof CATEGORIES)[number])) {
+        setCategory(reading.category as (typeof CATEGORIES)[number]);
+      }
+
+      if (!brand.trim() && reading.brand) {
+        setBrand(reading.brand);
+      }
+
+      // Size and size_unit arrive together or not at all - the backend drops
+      // one without the other, since an amount with no unit is meaningless.
+      if (!size.trim() && reading.size !== null) {
+        setSize(String(reading.size));
+      }
+
+      if (!sizeUnit && reading.size_unit) {
+        setSizeUnit(reading.size_unit);
+      }
+
+      // The date is offered, never applied. A misread date silently drives
+      // spoilage predictions and the expiry review modal, so it waits for a
+      // deliberate tap even though every other field prefills.
+      if (reading.printed_date) {
+        setSuggestedDate(reading.printed_date);
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'That photo could not be read.');
+    } finally {
+      setIsIdentifying(false);
+    }
+  }
+
+  function acceptSuggestedDate() {
+    if (!suggestedDate) {
+      return;
+    }
+
+    setEstimatedExpiry(suggestedDate);
+    // Stops the shelf-life effect from overwriting a date the user accepted.
+    setExpiryEdited(true);
+    setSuggestedDate('');
+  }
   async function startScanning() {
     setErrorMessage('');
     setIsScanning(true);
@@ -472,6 +599,73 @@ export default function AddInventoryItemPage() {
                   ) : null}
                 </div>
               ) : null}
+
+              <div className="mt-5 border-t border-gray-200 pt-5">
+                <p className="text-sm font-medium uppercase tracking-wide text-gray-600">Identify from a photo</p>
+                <p className="mt-2 text-sm font-light text-gray-600">
+                  No barcode, or a loose item? Photograph the label or upload a screenshot and Esca will read what it can.
+                </p>
+
+                <label className="mt-4 inline-flex cursor-pointer items-center rounded-lg border border-emerald-900 px-4 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-50">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handlePhotoSelected}
+                    disabled={isIdentifying}
+                  />
+                  {isIdentifying ? 'Reading photo...' : 'Take or upload a photo'}
+                </label>
+
+                {photoReading ? (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                    <p className="font-medium">Read from your photo</p>
+                    <p className="mt-1">Name: {photoReading.name ?? 'not legible'}</p>
+                    <p>Category: <span className="capitalize">{photoReading.category ?? 'not legible'}</span></p>
+                    <p>
+                      Size:{' '}
+                      {photoReading.size !== null && photoReading.size_unit
+                        ? `${photoReading.size} ${photoReading.size_unit}`
+                        : 'not legible'}
+                    </p>
+                    <p className="mt-1 text-xs text-amber-800">
+                      Anything not legible was left for you to fill in. You can edit every field before saving.
+                    </p>
+                  </div>
+                ) : null}
+
+                {suggestedDate ? (
+                  <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+                    <p>
+                      A date reading <span className="font-medium">{suggestedDate}</span> was found on the label
+                      {photoReading?.printed_date_kind
+                        ? ` (${photoReading.printed_date_kind.replace('_', ' ')})`
+                        : ''}
+                      .
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={acceptSuggestedDate}
+                        className="rounded-lg bg-emerald-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-800"
+                      >
+                        Use this expiry date
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSuggestedDate('')}
+                        className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-900 transition hover:bg-emerald-100"
+                      >
+                        Ignore
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs text-emerald-800">
+                      Check it against the package before using it - a misread date affects spoilage alerts.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {errorMessage ? (
