@@ -343,10 +343,11 @@ export async function deleteAccount(): Promise<ApiResult<{ deleted: true }>> {
   return apiRequest<{ deleted: true }>('/api/users/account', { method: 'DELETE' });
 }
 
-export type ItemImageIdentification = {
+export type ItemImageReading = {
   name: string | null;
   category: string | null;
   brand: string | null;
+  quantity: number | null;
   size: number | null;
   size_unit: string | null;
   printed_date: string | null;
@@ -354,11 +355,21 @@ export type ItemImageIdentification = {
   typical_shelf_life_days: number | null;
 };
 
+export type ItemImageReadingSet = {
+  /**
+   * A listing depicts products rather than being one, so any date on it
+   * belongs to the order or a stock photo. The backend already strips dates
+   * from a listing; this is here so the UI can explain why none appeared.
+   */
+  source_kind: 'physical_item' | 'listing';
+  items: ItemImageReading[];
+};
+
 export async function identifyItemImage(input: {
   image: string;
   media_type?: string;
-}): Promise<ApiResult<ItemImageIdentification>> {
-  return apiRequest<ItemImageIdentification>('/api/fridge/identify-image', {
+}): Promise<ApiResult<ItemImageReadingSet>> {
+  return apiRequest<ItemImageReadingSet>('/api/fridge/identify-image', {
     method: 'POST',
     body: JSON.stringify(input),
   });
