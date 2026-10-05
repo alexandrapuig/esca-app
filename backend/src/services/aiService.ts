@@ -360,6 +360,7 @@ export type ItemImageIdentification = {
   size_unit: string | null;
   printed_date: string | null;
   printed_date_kind: 'expiry' | 'best_before' | 'use_by' | 'packed' | null;
+  source_kind: 'physical_item' | 'listing';
   typical_shelf_life_days: number | null;
 };
 
@@ -397,7 +398,7 @@ export async function identifyItemFromImageWithClaude(params: {
     params.mediaType && IMAGE_MEDIA_TYPES.includes(params.mediaType) ? params.mediaType : 'image/jpeg';
 
   const output = await callClaude(
-    'You read a single grocery item from a photo of its packaging, label, or a screenshot of a product listing. Report only what is actually legible in the image. Do not use product knowledge to fill in a size, a brand, or a date you cannot read - a blurred weight panel means null, not your best guess at the usual size for that product. Every field is independently optional: a legible name with everything else null is a useful answer. Return strict JSON only, with these keys: name (string or null), category (one of produce|dairy|meat|seafood|bakery|frozen|pantry|beverage|other, or null), brand (string or null), size (number or null - the amount in ONE package, not a count of packages), size_unit (one of g|kg|ml|l|oz|lb|fl oz|other, or null - note fl oz is volume and oz is mass, never substitute one for the other; if the package is counted in pieces or bunches rather than measured, leave both size and size_unit null), printed_date (YYYY-MM-DD or null - transcribe a printed date only if you can read it in full; if the year is absent or any digit is uncertain, return null), printed_date_kind (one of expiry|best_before|use_by|packed, or null - what the label calls the date you read), typical_shelf_life_days (integer or null - this one may be inferred from the product type, as unopened shelf life from purchase). If the image does not show a single identifiable food item at all, return {"identified": false}.',
+    'You read a single grocery item from a photo of its packaging, label, or a screenshot of a product listing. Report only what is actually legible in the image. Do not use product knowledge to fill in a size, a brand, or a date you cannot read - a blurred weight panel means null, not your best guess at the usual size for that product. Every field is independently optional: a legible name with everything else null is a useful answer. Return strict JSON only, with these keys: name (string or null), category (one of produce|dairy|meat|seafood|bakery|frozen|pantry|beverage|other, or null), brand (string or null), size (number or null - the amount in ONE package, not a count of packages), size_unit (one of g|kg|ml|l|oz|lb|fl oz|other, or null - note fl oz is volume and oz is mass, never substitute one for the other; if the package is counted in pieces or bunches rather than measured, leave both size and size_unit null), printed_date (YYYY-MM-DD or null - transcribe a printed date only if you can read it in full; if the year is absent or any digit is uncertain, return null), printed_date_kind (one of expiry|best_before|use_by|packed, or null - what the label calls the date you read), source_kind (one of physical_item|listing) - physical_item when the photo shows the actual object in front of the camera: packaging, a label, produce on a counter. listing when the image is a screenshot or capture of something depicting a product rather than the product itself: a store page, a cart, an order confirmation, a receipt, a printed advertisement. A screenshot of a shopping cart is a listing even though it shows real products the user bought. typical_shelf_life_days (integer or null - this one may be inferred from the product type, as unopened shelf life from purchase). If the image does not show a single identifiable food item at all, return {"identified": false}.',
     [
       {
         role: 'user',
@@ -433,6 +434,7 @@ export async function identifyItemFromImageWithClaude(params: {
     size: size !== null && sizeUnit !== null ? size : null,
     size_unit: size !== null && sizeUnit !== null ? sizeUnit : null,
     printed_date: normalizePrintedDate(parsed.printed_date),
+    source_kind: parsed.source_kind === 'listing' ? 'listing' : 'physical_item',
     printed_date_kind:
       dateKind === 'expiry' || dateKind === 'best_before' || dateKind === 'use_by' || dateKind === 'packed'
         ? dateKind

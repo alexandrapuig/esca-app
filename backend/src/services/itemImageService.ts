@@ -90,7 +90,21 @@ export async function identifyItemFromImage(params: {
     // the dropdown keeps its default.
     const category = identified.category && CATEGORIES.includes(identified.category) ? identified.category : null;
 
-    return { success: true, data: { ...identified, category } };
+    // A listing shows a depiction of a product, not the carton in the
+    // user's fridge: a date on a store page or a cart screenshot belongs to
+    // the order or to a stock photo, never to the item being added. Dropped
+    // here rather than in the UI so it cannot reach the client at all.
+    const isListing = identified.source_kind === 'listing';
+
+    return {
+      success: true,
+      data: {
+        ...identified,
+        category,
+        printed_date: isListing ? null : identified.printed_date,
+        printed_date_kind: isListing ? null : identified.printed_date_kind,
+      },
+    };
   } catch (error) {
     console.error('identifyItemFromImageWithClaude failed', error);
 
