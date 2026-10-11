@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 
 import {
+  consumeFridgeItemUnits,
   deleteFridgeItem,
   generatePredictions,
   getFridgeItems,
@@ -146,6 +147,15 @@ function formatAmount(item: FridgeItem): string {
   }
 
   return count ? String(count) : '-';
+}
+
+/** Units of this row not yet eaten. */
+function remainingUnits(item: FridgeItem): number {
+  const total = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
+  const eaten =
+    typeof item.quantityConsumed === 'number' && item.quantityConsumed > 0 ? item.quantityConsumed : 0;
+
+  return Math.max(0, total - eaten);
 }
 
 function itemStatusStyles(status: FridgeItem['status']): string {
@@ -354,6 +364,19 @@ function InventoryPageContent() {
     setIsPredicting(false);
   }
 
+  // Eating one of several. The row stays fresh and visible until every unit
+  // is accounted for, at which point the backend flips it to consumed.
+  async function handleConsumeOne(itemId: string) {
+    const result = await consumeFridgeItemUnits(itemId, 1);
+
+    if (!result.success) {
+      setErrorMessage(result.error);
+      return;
+    }
+
+    setItems((current) => current.map((item) => (item.id === itemId ? result.data : item)));
+  }
+
   async function handleStatusUpdate(itemId: string, status: 'consumed' | 'expired' | 'fresh') {
     setErrorMessage('');
     const result = await updateFridgeItemStatus(itemId, status);
@@ -542,6 +565,15 @@ function InventoryPageContent() {
                             >
                               Edit
                             </Link>
+                            {remainingUnits(item) > 1 ? (
+                              <button
+                                type="button"
+                                className="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                                onClick={() => handleConsumeOne(item.id)}
+                              >
+                                Ate one ({remainingUnits(item)} left)
+                              </button>
+                            ) : null}
                             <button
                               type="button"
                               className="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
@@ -626,6 +658,15 @@ function InventoryPageContent() {
                       >
                         Edit
                       </Link>
+                      {remainingUnits(item) > 1 ? (
+                        <button
+                          type="button"
+                          className="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700"
+                          onClick={() => handleConsumeOne(item.id)}
+                        >
+                          Ate one ({remainingUnits(item)} left)
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700"
