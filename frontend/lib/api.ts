@@ -161,7 +161,10 @@ export async function addFridgeItem(input: {
   typical_shelf_life_days?: number;
   brand?: string;
   purchase_location?: string;
+  /** The line total as printed. Stats sum this for consumed rows. */
   purchase_price?: number;
+  /** A per-unit rate, only where one was actually printed. */
+  unit_price?: number;
   notes?: string;
   purchase_date?: string;
   barcode?: string;

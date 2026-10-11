@@ -468,6 +468,13 @@ export default function AddInventoryItemPage() {
         typical_shelf_life_days: item.typical_shelf_life_days ?? undefined,
         brand: item.brand ?? undefined,
         purchase_date: purchaseDate || undefined,
+        // purchase_price is the LINE TOTAL as printed, which is what
+        // getUserStats sums for consumed rows. Do not divide it by quantity
+        // here or money saved undercounts.
+        purchase_price: item.price ?? undefined,
+        // Only set when a per-unit rate was actually printed on the listing,
+        // such as a per-pound price beside a weighed item.
+        unit_price: item.unit_price ?? undefined,
         // Nothing here sets an expiry: a listing carries no date for the
         // item in your fridge, and the backend computes one from shelf life.
       });
