@@ -271,12 +271,13 @@ export async function getUserStats(householdId: string): Promise<ServiceResult<U
   // items while the inventory showed everyone's.
   const { data, error } = await supabase
     .from('fridge_items')
-    .select('status, category, quantity, size, size_unit, purchase_price')
+    .select('status, category, quantity, quantity_consumed, size, size_unit, purchase_price')
     .eq('household_id', householdId)
     .returns<{
       status: string;
       category: string | null;
       quantity: number | null;
+      quantity_consumed: number | null;
       size: number | null;
       size_unit: string | null;
       purchase_price: number | null;
@@ -287,30 +288,69 @@ export async function getUserStats(householdId: string): Promise<ServiceResult<U
     return { success: false, status: 500, error: 'Unable to fetch stats' };
   }
 
-  const consumed = data.filter((item) => item.status === 'consumed');
-  const expiredCount = data.filter((item) => item.status === 'expired').length;
+  // Everything below counts UNITS, not rows. A row of two bottles with one
+  // drunk is still status 'fresh' but has quantity_consumed 1, so filtering
+  // on status alone would miss it. A row marked consumed was backfilled to
+  // quantity_consumed = quantity, so the column is the single source of truth.
+  function unitsOf(item: { quantity: number | null }): number {
+    return typeof item.quantity === 'number' && Number.isFinite(item.quantity) && item.quantity > 0
+      ? item.quantity
+      : 1;
+  }
 
-  const wastePreventedKg = consumed.reduce((total, item) => total + itemWeightKg(item), 0);
+  function unitsConsumedOf(item: { quantity: number | null; quantity_consumed: number | null }): number {
+    const consumedUnits =
+      typeof item.quantity_consumed === 'number' && Number.isFinite(item.quantity_consumed)
+        ? item.quantity_consumed
+        : 0;
 
-  const moneySaved = consumed.reduce((total, item) => {
-    const price =
-      typeof item.purchase_price === 'number' && Number.isFinite(item.purchase_price) && item.purchase_price >= 0
-        ? item.purchase_price
-        : ESTIMATED_ITEM_PRICE;
+    // Never credit more than the row holds, however the data got there.
+    return Math.max(0, Math.min(consumedUnits, unitsOf(item)));
+  }
 
-    return total + price;
+  const withConsumption = data.filter((item) => unitsConsumedOf(item) > 0);
+  const consumedUnitCount = withConsumption.reduce((total, item) => total + unitsConsumedOf(item), 0);
+
+  // Expired is still whole-row: nothing partially expires.
+  const expiredUnitCount = data
+    .filter((item) => item.status === 'expired')
+    .reduce((total, item) => total + unitsOf(item), 0);
+
+  const wastePreventedKg = withConsumption.reduce((total, item) => {
+    // itemWeightKg multiplies by quantity, so ask it for ONE package and
+    // scale by however many were actually eaten.
+    const perUnitKg = itemWeightKg({ ...item, quantity: 1 });
+
+    return total + perUnitKg * unitsConsumedOf(item);
+  }, 0);
+
+  const moneySaved = withConsumption.reduce((total, item) => {
+    const units = unitsOf(item);
+    const eaten = unitsConsumedOf(item);
+
+    // purchase_price is the LINE TOTAL for the whole row, so eating one of
+    // two bottles credits half of it.
+    if (
+      typeof item.purchase_price === 'number' &&
+      Number.isFinite(item.purchase_price) &&
+      item.purchase_price >= 0
+    ) {
+      return total + (item.purchase_price / units) * eaten;
+    }
+
+    return total + ESTIMATED_ITEM_PRICE * eaten;
   }, 0);
 
   // Fresh items are still undecided, so only settled ones count. Null until
   // something has actually been consumed or expired - 0% would read as failure
   // when it really means "nothing has happened yet".
-  const settled = consumed.length + expiredCount;
-  const rescueRatePercent = settled > 0 ? Math.round((consumed.length / settled) * 100) : null;
+  const settled = consumedUnitCount + expiredUnitCount;
+  const rescueRatePercent = settled > 0 ? Math.round((consumedUnitCount / settled) * 100) : null;
 
   return {
     success: true,
     data: {
-      items_consumed_count: consumed.length,
+      items_consumed_count: consumedUnitCount,
       waste_prevented_kg: Math.round(wastePreventedKg * 100) / 100,
       co2_saved_kg: Math.round(wastePreventedKg * CO2_PER_KG * 100) / 100,
       money_saved: Math.round(moneySaved * 100) / 100,
