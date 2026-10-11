@@ -128,6 +128,26 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'consumed', label: 'Consumed' },
 ];
 
+/**
+ * "2 x 500 g", "15 oz", "3". Reads size/sizeUnit, not the deprecated unit
+ * column, which is null on everything added since the size migration.
+ *
+ * The count is only shown when it is above 1: "1 x 15 oz" is noise.
+ */
+function formatAmount(item: FridgeItem): string {
+  const count = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : null;
+  const size =
+    typeof item.size === 'number' && item.size > 0
+      ? `${item.size}${item.sizeUnit && item.sizeUnit !== 'other' ? ` ${item.sizeUnit}` : ''}`
+      : null;
+
+  if (size) {
+    return count && count > 1 ? `${count} × ${size}` : size;
+  }
+
+  return count ? String(count) : '-';
+}
+
 function itemStatusStyles(status: FridgeItem['status']): string {
   if (status === 'consumed') {
     return 'bg-emerald-100 text-emerald-800';
@@ -499,7 +519,7 @@ function InventoryPageContent() {
                         <td className="px-4 py-4 text-stone-700">{formatDate(item.purchaseDate)}</td>
                         <td className="px-4 py-4 text-stone-700">{formatDate(item.estimatedExpiry)}</td>
                         <td className="px-4 py-4 text-stone-700">
-                          {item.quantity ? `${item.quantity}${item.unit ? ` ${item.unit}` : ''}` : '-'}
+                          {formatAmount(item)}
                         </td>
                         <td className="px-4 py-4">
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${itemStatusStyles(item.status)}`}>
@@ -597,7 +617,7 @@ function InventoryPageContent() {
                     </p>
                     <p className="mt-1 text-sm text-stone-600">{prediction?.reasoning ?? 'Generate predictions to view reasoning.'}</p>
                     <p className="mt-1 text-sm text-stone-600">
-                      Quantity: {item.quantity ? `${item.quantity}${item.unit ? ` ${item.unit}` : ''}` : '-'}
+                      Quantity: {formatAmount(item)}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Link
