@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 const FRIDGE_ITEM_COLUMNS =
-  'id, user_id, name, category, quantity, unit, size, size_unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at, brand, purchase_location, purchase_price, unit_price, notes, barcode';
+  'id, user_id, name, category, quantity, quantity_consumed, unit, size, size_unit, typical_shelf_life_days, purchase_date, estimated_expiry, status, created_at, brand, purchase_location, purchase_price, unit_price, notes, barcode';
 
 /**
  * The fixed size_unit list. Volume and mass are kept separate on purpose:
@@ -85,6 +85,8 @@ type FridgeItemRow = {
   name: string;
   category: string | null;
   quantity: number | null;
+  /** Units of this row already eaten. The row flips to consumed at quantity. */
+  quantity_consumed: number | null;
   size: number | null;
   size_unit: string | null;
   /** @deprecated Still written for older clients. Nothing reads it. */
@@ -108,6 +110,7 @@ export type FridgeItem = {
   name: string;
   category: string | null;
   quantity: number | null;
+  quantityConsumed: number | null;
   size: number | null;
   sizeUnit: string | null;
   /** @deprecated Still returned for older clients. */
@@ -146,6 +149,7 @@ function mapFridgeItem(row: FridgeItemRow): FridgeItem {
     name: row.name,
     category: row.category,
     quantity: row.quantity,
+    quantityConsumed: row.quantity_consumed,
     size: row.size,
     sizeUnit: row.size_unit,
     unit: row.unit,
@@ -464,6 +468,79 @@ export async function markItemStillHave(params: {
   return { success: true, data: mapFridgeItem(data) };
 }
 
+/**
+ * Records that some units of a row were eaten, without consuming the whole
+ * row. Two bottles with one drunk stays fresh and visible at quantity 2,
+ * quantity_consumed 1; stats credit half the line total and half the weight.
+ *
+ * The row flips to 'consumed' only once every unit is accounted for.
+ */
+export async function consumeFridgeItemUnits(params: {
+  householdId: string;
+  itemId: string;
+  units: number;
+}): Promise<ServiceResult<FridgeItem>> {
+  let supabase: SupabaseClient;
+
+  try {
+    supabase = getSupabaseAdminClient();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Supabase is not configured';
+    return { success: false, status: 500, error: message };
+  }
+
+  if (!Number.isFinite(params.units) || params.units <= 0) {
+    return { success: false, status: 400, error: 'Units must be a positive number' };
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from('fridge_items')
+    .select('quantity, quantity_consumed, status')
+    .eq('id', params.itemId)
+    .eq('household_id', params.householdId)
+    .single<{ quantity: number | null; quantity_consumed: number | null; status: string }>();
+
+  if (existingError || !existing) {
+    return { success: false, status: 404, error: 'Fridge item not found' };
+  }
+
+  if (existing.status !== 'fresh') {
+    return { success: false, status: 400, error: 'Only a fresh item can be partly consumed' };
+  }
+
+  const rowUnits =
+    typeof existing.quantity === 'number' && Number.isFinite(existing.quantity) && existing.quantity > 0
+      ? existing.quantity
+      : 1;
+
+  const alreadyConsumed =
+    typeof existing.quantity_consumed === 'number' && Number.isFinite(existing.quantity_consumed)
+      ? Math.max(0, existing.quantity_consumed)
+      : 0;
+
+  // Never credit more than the row holds.
+  const nextConsumed = Math.min(rowUnits, alreadyConsumed + params.units);
+
+  const { data, error } = await supabase
+    .from('fridge_items')
+    .update({
+      quantity_consumed: nextConsumed,
+      status: nextConsumed >= rowUnits ? 'consumed' : 'fresh',
+    })
+    .eq('id', params.itemId)
+    .eq('household_id', params.householdId)
+    .select(
+      FRIDGE_ITEM_COLUMNS,
+    )
+    .single<FridgeItemRow>();
+
+  if (error || !data) {
+    return { success: false, status: 500, error: 'Unable to update fridge item' };
+  }
+
+  return { success: true, data: mapFridgeItem(data) };
+}
+
 export async function updateFridgeItemStatus(params: {
   householdId: string;
   itemId: string;
@@ -478,9 +555,41 @@ export async function updateFridgeItemStatus(params: {
     return { success: false, status: 500, error: message };
   }
 
+  // Stats count units via quantity_consumed, so a whole-row status change has
+  // to move that column too: consuming a row of two consumes both, and undoing
+  // it back to fresh must not leave units credited that nobody ate.
+  const { data: existing, error: existingError } = await supabase
+    .from('fridge_items')
+    .select('quantity')
+    .eq('id', params.itemId)
+    .eq('household_id', params.householdId)
+    .single<{ quantity: number | null }>();
+
+  if (existingError || !existing) {
+    return { success: false, status: 404, error: 'Fridge item not found' };
+  }
+
+  const rowUnits =
+    typeof existing.quantity === 'number' && Number.isFinite(existing.quantity) && existing.quantity > 0
+      ? existing.quantity
+      : 1;
+
+  const statusUpdate: { status: FridgeStatus; quantity_consumed?: number } = {
+    status: params.status,
+  };
+
+  if (params.status === 'consumed') {
+    statusUpdate.quantity_consumed = rowUnits;
+  }
+
+  // Expired and fresh both mean nothing was eaten from this row.
+  if (params.status === 'fresh' || params.status === 'expired') {
+    statusUpdate.quantity_consumed = 0;
+  }
+
   const { data, error } = await supabase
     .from('fridge_items')
-    .update({ status: params.status })
+    .update(statusUpdate)
     .eq('id', params.itemId)
     .eq('household_id', params.householdId)
     .select(

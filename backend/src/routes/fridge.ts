@@ -1,6 +1,7 @@
 import { Router, type Request } from 'express';
 
 import {
+  consumeFridgeItemUnits,
   createFridgeItem,
   deleteFridgeItem,
   listFridgeItems,
@@ -300,6 +301,29 @@ router.post('/items/:id/still-have', async (req, res) => {
   const result = await markItemStillHave({
     householdId: request.user.householdId,
     itemId: req.params.id,
+  });
+
+  if (!result.success) {
+    res.status(result.status).json({ success: false, error: result.error });
+    return;
+  }
+
+  res.status(200).json({ success: true, data: result.data });
+});
+
+/**
+ * Eat some of a row without consuming all of it: "one of these two bottles".
+ * The service flips the row to consumed once every unit is accounted for.
+ */
+router.post('/items/:id/consume', async (req, res) => {
+  const request = getAuthenticatedRequest(req);
+  const body = req.body as { units?: number };
+  const units = typeof body.units === 'number' ? body.units : 1;
+
+  const result = await consumeFridgeItemUnits({
+    householdId: request.user.householdId,
+    itemId: req.params.id,
+    units,
   });
 
   if (!result.success) {
