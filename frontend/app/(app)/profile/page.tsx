@@ -2,9 +2,17 @@
 
 import { useEffect, useState } from 'react';
 
-import { deleteAccount, getUserProfile, getUserStats, updateUserProfile } from '@/lib/api';
+import {
+  createHouseholdInvite,
+  deleteAccount,
+  getHousehold,
+  getUserProfile,
+  getUserStats,
+  revokeHouseholdInvite,
+  updateUserProfile,
+} from '@/lib/api';
 import { signOut } from '@/lib/supabase';
-import type { UserStats } from '@/lib/api';
+import type { HouseholdSummary, UserStats } from '@/lib/api';
 
 const DIETARY_OPTIONS = [
   { id: 'vegetarian', label: 'Vegetarian' },
@@ -27,6 +35,9 @@ export default function ProfilePage() {
   const [name, setName] = useState('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [household, setHousehold] = useState<HouseholdSummary | null>(null);
+  const [isInviting, setIsInviting] = useState(false);
+  const [copiedToken, setCopiedToken] = useState('');
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -54,6 +65,12 @@ export default function ProfilePage() {
         setEmail(profileResult.data.email);
         setName(profileResult.data.name ?? '');
         setDietaryRestrictions(profileResult.data.dietary_restrictions);
+
+        const householdResult = await getHousehold();
+
+        if (householdResult.success) {
+          setHousehold(householdResult.data);
+        }
       } else {
         setErrorMessage(profileResult.error);
       }
@@ -67,6 +84,56 @@ export default function ProfilePage() {
 
     void loadProfile();
   }, []);
+
+  function inviteUrl(token: string): string {
+    const origin = typeof window === 'undefined' ? '' : window.location.origin;
+
+    return `${origin}/join/${token}`;
+  }
+
+  async function handleCreateInvite() {
+    setErrorMessage('');
+    setIsInviting(true);
+
+    const result = await createHouseholdInvite();
+
+    setIsInviting(false);
+
+    if (!result.success) {
+      setErrorMessage(result.error);
+      return;
+    }
+
+    setHousehold((current) =>
+      current ? { ...current, pendingInvites: [result.data, ...current.pendingInvites] } : current,
+    );
+  }
+
+  async function handleRevokeInvite(inviteId: string) {
+    const result = await revokeHouseholdInvite(inviteId);
+
+    if (!result.success) {
+      setErrorMessage(result.error);
+      return;
+    }
+
+    setHousehold((current) =>
+      current
+        ? { ...current, pendingInvites: current.pendingInvites.filter((invite) => invite.id !== inviteId) }
+        : current,
+    );
+  }
+
+  async function handleCopyInvite(token: string) {
+    try {
+      await navigator.clipboard.writeText(inviteUrl(token));
+      setCopiedToken(token);
+      window.setTimeout(() => setCopiedToken(''), 2000);
+    } catch {
+      // Clipboard access can be refused; the link is visible to copy by hand.
+      setErrorMessage('Could not copy automatically. Select the link and copy it.');
+    }
+  }
 
   function toggleDietaryRestriction(id: string) {
     setDietaryRestrictions((prev) =>
@@ -166,6 +233,76 @@ export default function ProfilePage() {
             })}
           </div>
         </section>
+
+        {household ? (
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">
+            <p className="text-sm font-medium uppercase tracking-wide text-gray-500">Household</p>
+            <p className="mt-2 text-sm font-light text-gray-600">
+              Everyone in a household shares the same inventory, recipes and impact stats.
+            </p>
+
+            <ul className="mt-6 flex flex-col gap-3">
+              {household.members.map((member) => (
+                <li
+                  key={member.userId}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 px-4 py-3"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">{member.name || member.email}</p>
+                    {member.name ? <p className="text-xs text-gray-500">{member.email}</p> : null}
+                  </div>
+                  <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-medium capitalize text-gray-700">
+                    {member.role}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {household.isOwner ? (
+              <div className="mt-6">
+                {household.pendingInvites.length > 0 ? (
+                  <ul className="mb-4 flex flex-col gap-3">
+                    {household.pendingInvites.map((invite) => (
+                      <li key={invite.id} className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                        <p className="text-xs font-medium text-emerald-900">Join my household</p>
+                        <p className="mt-1 break-all font-mono text-xs text-gray-700">{inviteUrl(invite.token)}</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyInvite(invite.token)}
+                            className="rounded-full bg-emerald-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-emerald-800"
+                          >
+                            {copiedToken === invite.token ? 'Copied' : 'Copy link'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeInvite(invite.id)}
+                            className="rounded-full border border-gray-300 bg-white px-4 py-2 text-xs font-medium text-gray-700 transition hover:border-gray-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={handleCreateInvite}
+                  disabled={isInviting}
+                  className="rounded-lg border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-900 transition hover:border-gray-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isInviting ? 'Creating link...' : 'Create a join link'}
+                </button>
+                <p className="mt-2 text-xs font-light text-gray-500">
+                  Single use, expires after 7 days. Whoever opens it joins this household, and anything
+                  already in their fridge moves across.
+                </p>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         {stats ? (
           <section className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">

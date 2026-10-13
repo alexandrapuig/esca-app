@@ -268,6 +268,55 @@ export async function consumeFridgeItemUnits(id: string, units = 1): Promise<Api
   });
 }
 
+export type HouseholdMember = {
+  userId: string;
+  email: string;
+  name: string | null;
+  role: string;
+  joinedAt: string | null;
+};
+
+export type HouseholdInvite = {
+  id: string;
+  token: string;
+  expiresAt: string;
+  createdAt: string | null;
+};
+
+export type HouseholdSummary = {
+  householdId: string;
+  name: string | null;
+  maxMembers: number;
+  members: HouseholdMember[];
+  /** Only populated for the owner: the token is the credential. */
+  pendingInvites: HouseholdInvite[];
+  isOwner: boolean;
+};
+
+export async function getHousehold(): Promise<ApiResult<HouseholdSummary>> {
+  return apiRequest<HouseholdSummary>('/api/households', { method: 'GET' });
+}
+
+/** Mints a single-use join link. Refused while the plan caps members at one. */
+export async function createHouseholdInvite(): Promise<ApiResult<HouseholdInvite>> {
+  return apiRequest<HouseholdInvite>('/api/households/invites', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function revokeHouseholdInvite(id: string): Promise<ApiResult<{ revoked: true }>> {
+  return apiRequest<{ revoked: true }>(`/api/households/invites/${id}`, { method: 'DELETE' });
+}
+
+/** Moves your items into the inviting household and deletes your old one. */
+export async function joinHousehold(token: string): Promise<ApiResult<{ householdId: string }>> {
+  return apiRequest<{ householdId: string }>('/api/households/join', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
 export async function getUserProfile(): Promise<ApiResult<UserProfile>> {
   return apiRequest<UserProfile>('/api/users/profile', { method: 'GET' });
 }
