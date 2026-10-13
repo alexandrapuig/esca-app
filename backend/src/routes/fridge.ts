@@ -356,6 +356,7 @@ router.put('/items/:id', async (req, res) => {
 
   const updateInput: Parameters<typeof updateFridgeItem>[0] = {
     householdId: request.user.householdId,
+    userId: request.user.id,
     itemId,
   };
 

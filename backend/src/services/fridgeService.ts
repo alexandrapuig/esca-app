@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { recordExpiryCorrection } from './expiryLearningService';
 import { getSupabaseAdminClient } from '../utils/supabaseAdmin';
 
 const FRIDGE_ITEM_COLUMNS =
@@ -272,6 +273,16 @@ export async function createFridgeItem(params: {
       ? Math.round(params.unitPrice * 100) / 100
       : null;
 
+  // What we would have chosen on our own, and what the user actually sent.
+  // Compared after the insert so a correction can be recorded: the form shows
+  // our estimate and lets it be overridden, but sends the field either way,
+  // so a differing value is the only signal that it was changed.
+  const computedExpiry = estimatedExpiry.toISOString().slice(0, 10);
+  const submittedExpiry =
+    params.estimatedExpiry && /^\d{4}-\d{2}-\d{2}$/.test(params.estimatedExpiry)
+      ? params.estimatedExpiry
+      : null;
+
   // New fields win when present; the legacy pair is only used on its own.
   const sizing =
     params.size !== undefined || params.sizeUnit !== undefined
@@ -296,10 +307,7 @@ export async function createFridgeItem(params: {
     purchase_date: purchaseDate.toISOString().slice(0, 10),
     // The add form computes and shows an expiry before saving, and the user
     // can override it. Prefer what they actually saw over recomputing.
-    estimated_expiry:
-      params.estimatedExpiry && /^\d{4}-\d{2}-\d{2}$/.test(params.estimatedExpiry)
-        ? params.estimatedExpiry
-        : estimatedExpiry.toISOString().slice(0, 10),
+    estimated_expiry: submittedExpiry ?? computedExpiry,
     status: 'fresh',
     brand: params.brand?.trim() || null,
     purchase_location: params.purchaseLocation?.trim() || null,
@@ -324,6 +332,24 @@ export async function createFridgeItem(params: {
       status: 500,
       error: 'Unable to create fridge item',
     };
+  }
+
+  // Not awaited: logging a correction must never delay or fail the save.
+  if (submittedExpiry && submittedExpiry !== computedExpiry) {
+    void recordExpiryCorrection({
+      householdId: params.householdId,
+      userId: params.userId,
+      fridgeItemId: data.id,
+      itemName: row.name,
+      category: normalizedCategory,
+      barcode: row.barcode,
+      estimatedExpiry: computedExpiry,
+      // A shelf life supplied with the item came from Claude or Open Food
+      // Facts; without one we fell back to the per-category default.
+      estimateSource: shelfLifeDays ? 'shelf_life' : 'category_default',
+      correctedExpiry: submittedExpiry,
+      stage: 'create',
+    });
   }
 
   return {
@@ -629,6 +655,8 @@ export async function updateFridgeItemStatus(params: {
 
 export async function updateFridgeItem(params: {
   householdId: string;
+  /** Only used to attribute an expiry correction. */
+  userId: string;
   itemId: string;
   name?: string;
   category?: string;
@@ -753,6 +781,27 @@ export async function updateFridgeItem(params: {
     };
   }
 
+  // Read before writing so a changed expiry can be compared against what was
+  // there. On an edit the previous stored date is the estimate being
+  // corrected -- "I thought Friday, it is going off tomorrow".
+  const previous =
+    params.estimatedExpiry !== undefined
+      ? (
+          await supabase
+            .from('fridge_items')
+            .select('name, category, barcode, estimated_expiry, typical_shelf_life_days')
+            .eq('id', params.itemId)
+            .eq('household_id', params.householdId)
+            .single<{
+              name: string;
+              category: string | null;
+              barcode: string | null;
+              estimated_expiry: string | null;
+              typical_shelf_life_days: number | null;
+            }>()
+        ).data
+      : null;
+
   const { data, error } = await supabase
     .from('fridge_items')
     .update(updates)
@@ -770,6 +819,22 @@ export async function updateFridgeItem(params: {
       status: 500,
       error: 'Unable to update fridge item',
     };
+  }
+
+  // Not awaited: logging must never delay or fail the save.
+  if (previous && params.estimatedExpiry && previous.estimated_expiry !== params.estimatedExpiry) {
+    void recordExpiryCorrection({
+      householdId: params.householdId,
+      userId: params.userId,
+      fridgeItemId: params.itemId,
+      itemName: previous.name,
+      category: previous.category,
+      barcode: previous.barcode,
+      estimatedExpiry: previous.estimated_expiry,
+      estimateSource: previous.typical_shelf_life_days ? 'shelf_life' : 'category_default',
+      correctedExpiry: params.estimatedExpiry,
+      stage: 'edit',
+    });
   }
 
   if (!data) {

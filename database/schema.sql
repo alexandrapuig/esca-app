@@ -132,6 +132,52 @@ ALTER TABLE public.households        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.household_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.household_invites ENABLE ROW LEVEL SECURITY;
 
+-- ---------------------------------------------------------------------------
+-- expiry_corrections
+-- ---------------------------------------------------------------------------
+--
+-- Added 2026-10-12. A log, not a feature: nothing reads it yet.
+--
+-- typical_shelf_life_days is written once when an item is created and never
+-- revised by use, so an estimate that is consistently wrong stays wrong. This
+-- records every time a user set an expiry different from the one computed,
+-- at creation or on a later edit, so a pattern has history to be found in.
+--
+-- Product facts and dates only: no price, purchase location or notes, matching
+-- the restraint analyticsService already applies to its allowlist.
+--
+-- delta_days is stored rather than derived so a query can average it without
+-- date arithmetic. Negative means the real date was sooner than estimated,
+-- which is the direction that causes waste.
+--
+-- item_name and category are copied here rather than joined from fridge_items
+-- because the item is deleted once consumed and the pattern outlives it.
+
+CREATE TABLE IF NOT EXISTS public.expiry_corrections (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id       uuid NOT NULL REFERENCES public.households(id) ON DELETE CASCADE,
+  user_id            uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  fridge_item_id     uuid REFERENCES public.fridge_items(id) ON DELETE SET NULL,
+  item_name          text NOT NULL,
+  category           text,
+  barcode            text,
+  estimated_expiry   date,
+  -- 'shelf_life' (Claude or Open Food Facts) or 'category_default'.
+  estimate_source    text,
+  corrected_expiry   date NOT NULL,
+  delta_days         integer,
+  -- 'create' when adjusted on the add form, 'edit' when changed afterwards.
+  corrected_at_stage text NOT NULL,
+  created_at         timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_expiry_corrections_household_id
+  ON public.expiry_corrections USING btree (household_id);
+CREATE INDEX IF NOT EXISTS idx_expiry_corrections_barcode
+  ON public.expiry_corrections USING btree (barcode);
+
+ALTER TABLE public.expiry_corrections ENABLE ROW LEVEL SECURITY;
+
 -- accept_household_invite(token, user_id) -> new household id
 --
 -- Lives in the database rather than the service because it moves five tables
