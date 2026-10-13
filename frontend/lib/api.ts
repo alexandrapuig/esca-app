@@ -18,6 +18,8 @@ export type FridgeItem = {
   name: string;
   category: string | null;
   quantity: number | null;
+  /** Units of this row already eaten. The row flips to consumed at quantity. */
+  quantityConsumed: number | null;
   size: number | null;
   sizeUnit: string | null;
   /** @deprecated Kept for older clients. Use size/sizeUnit. */
@@ -255,6 +257,14 @@ export async function markItemStillHave(id: string): Promise<ApiResult<FridgeIte
   return apiRequest<FridgeItem>(`/api/fridge/items/${id}/still-have`, {
     method: 'POST',
     body: JSON.stringify({}),
+  });
+}
+
+/** Eat some of a multi-pack row without consuming all of it. */
+export async function consumeFridgeItemUnits(id: string, units = 1): Promise<ApiResult<FridgeItem>> {
+  return apiRequest<FridgeItem>(`/api/fridge/items/${id}/consume`, {
+    method: 'POST',
+    body: JSON.stringify({ units }),
   });
 }
 
