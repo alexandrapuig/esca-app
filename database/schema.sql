@@ -106,8 +106,46 @@ CREATE TABLE IF NOT EXISTS public.household_members (
 CREATE INDEX IF NOT EXISTS idx_household_members_household_id
   ON public.household_members USING btree (household_id);
 
+-- Added 2026-10-11. Single-use "join my household" links.
+--
+-- accepted_at set means spent; revoked_at set means cancelled. They are
+-- separate so "I cancelled this" is distinguishable from "this went stale".
+-- The token IS the credential, so only an owner is shown pending invites.
+CREATE TABLE IF NOT EXISTS public.household_invites (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id  uuid NOT NULL REFERENCES public.households(id) ON DELETE CASCADE,
+  invited_by    uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  token         text NOT NULL UNIQUE,
+  expires_at    timestamptz NOT NULL,
+  accepted_at   timestamptz,
+  accepted_by   uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  revoked_at    timestamptz,
+  created_at    timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_household_invites_token
+  ON public.household_invites USING btree (token);
+CREATE INDEX IF NOT EXISTS idx_household_invites_household_id
+  ON public.household_invites USING btree (household_id);
+
 ALTER TABLE public.households        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.household_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.household_invites ENABLE ROW LEVEL SECURITY;
+
+-- accept_household_invite(token, user_id) -> new household id
+--
+-- Lives in the database rather than the service because it moves five tables
+-- plus the membership row: a half-applied move would split a user's data
+-- across two households with no way to tell which is which. The invite row is
+-- locked FOR UPDATE so two simultaneous accepts cannot both spend it.
+--
+-- The joiner's old household is DELETED after its contents move across, which
+-- is why accepting loses nothing. EXECUTE is revoked from anon/authenticated:
+-- only the backend's service key may call it.
+--
+-- Raises: invite_not_found, invite_already_used, invite_revoked,
+-- invite_expired, already_a_member, household_full, user_has_no_household.
+-- See backend/src/services/householdService.ts for the mapping to HTTP codes.
 
 -- ---------------------------------------------------------------------------
 -- fridge_items

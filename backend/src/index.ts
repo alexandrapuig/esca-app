@@ -5,6 +5,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 
 import authRoutes from './routes/auth';
+import householdsRoutes from './routes/households';
 import usersRoutes from './routes/users';
 import barcodeRoutes from './routes/barcode';
 import fridgeRoutes from './routes/fridge';
@@ -40,6 +41,7 @@ app.use(express.json({ limit: '10mb' }));
 
 app.use('/auth', authRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/households', householdsRoutes);
 app.use('/api/fridge', fridgeRoutes);
 app.use('/api/barcode', barcodeRoutes);
 app.use('/api/predictions', predictionsRoutes);
