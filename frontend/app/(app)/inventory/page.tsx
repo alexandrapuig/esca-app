@@ -107,6 +107,10 @@ const RISK_THRESHOLDS: Record<string, [number, number]> = {
   beverage: [5, 14],
   frozen: [14, 45],
   pantry: [14, 45],
+  // Spices lose potency rather than spoil, and an opened condiment is
+  // perishable but slowly. Both were lumped into pantry's [14, 45] before.
+  condiments: [14, 60],
+  spices: [90, 365],
   other: [3, 7],
 };
 

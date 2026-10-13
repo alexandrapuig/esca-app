@@ -141,8 +141,12 @@ async function identifyWithOpenFoodFacts(barcode: string): Promise<BarcodeLookup
               ? 'bakery'
               : matches('beverage', 'drink', 'juice', 'water', 'soda', 'coffee', 'tea')
                 ? 'beverage'
-                : matches('fresh fruit', 'fresh vegetable', 'fresh-fruit', 'fresh-vegetable', 'salad', 'herb')
-                  ? 'produce'
+                : matches('spice', 'seasoning', 'dried herb', 'herbs and spices', 'pepper')
+                  ? 'spices'
+                  : matches('condiment', 'sauce', 'dressing', 'mustard', 'ketchup', 'mayonnaise', 'relish', 'salsa')
+                    ? 'condiments'
+                    : matches('fresh fruit', 'fresh vegetable', 'fresh-fruit', 'fresh-vegetable', 'salad', 'herb')
+                      ? 'produce'
                   : matches(
                         'snack',
                         'biscuit',
@@ -157,12 +161,8 @@ async function identifyWithOpenFoodFacts(barcode: string): Promise<BarcodeLookup
                         'tinned',
                         'preserve',
                         'spread',
-                        'sauce',
-                        'condiment',
                         'oil',
                         'vinegar',
-                        'spice',
-                        'seasoning',
                         'salt',
                         'sugar',
                         'flour',

@@ -77,6 +77,8 @@ type FridgeCategory =
   | 'frozen'
   | 'pantry'
   | 'beverage'
+  | 'condiments'
+  | 'spices'
   | 'other';
 
 type FridgeItemRow = {
@@ -178,7 +180,9 @@ function normalizeCategory(category?: string): FridgeCategory {
     normalized === 'bakery' ||
     normalized === 'frozen' ||
     normalized === 'pantry' ||
-    normalized === 'beverage'
+    normalized === 'beverage' ||
+    normalized === 'condiments' ||
+    normalized === 'spices'
   ) {
     return normalized;
   }
@@ -196,6 +200,10 @@ function estimateExpiryDate(category: FridgeCategory, purchaseDate: Date): Date 
     frozen: 90,
     pantry: 180,
     beverage: 30,
+    // Unopened. Spices keep for years and lose potency rather than spoil;
+    // an unopened condiment sits somewhere between pantry and dairy.
+    condiments: 120,
+    spices: 730,
     other: 14,
   };
 

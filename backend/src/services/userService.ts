@@ -48,6 +48,8 @@ const CATEGORY_WEIGHTS_KG: Record<string, number> = {
   frozen: 0.4,
   pantry: 0.45,
   beverage: 1.0,
+  condiments: 0.4,
+  spices: 0.05,
   other: 0.3,
 };
 

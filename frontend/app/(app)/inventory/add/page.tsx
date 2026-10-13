@@ -7,7 +7,7 @@ import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 
 import { addFridgeItem, identifyBarcode, identifyItemImage, type BarcodeIdentification, type ItemImageReading } from '@/lib/api';
 
-const CATEGORIES = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverage', 'other'] as const;
+const CATEGORIES = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverage', 'condiments', 'spices', 'other'] as const;
 
 // Must match SIZE_UNITS in backend/src/services/fridgeService.ts. 'fl oz' is
 // volume and 'oz' is mass; they are not interchangeable.

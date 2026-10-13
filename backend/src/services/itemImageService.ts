@@ -10,7 +10,7 @@ import { identifyItemsFromImageWithClaude, type ItemImageReading, type ItemImage
  * barcode identification.
  */
 
-const CATEGORIES = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverage', 'other'];
+const CATEGORIES = ['produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverage', 'condiments', 'spices', 'other'];
 
 const ACCEPTED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
