@@ -71,7 +71,10 @@ export default function RecipesPage() {
     const jobId = result.data.id;
     const startedAt = Date.now();
     const POLL_INTERVAL_MS = 2500;
-    const TIMEOUT_MS = 90000;
+    // Generation waits for the next cron tick before it even starts, which is
+    // up to 60s, then takes ~40s to run. 90s was the pre-cron figure and fired
+    // while jobs were still on track.
+    const TIMEOUT_MS = 150000;
 
     clearPolling();
 
