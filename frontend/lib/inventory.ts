@@ -67,3 +67,56 @@ export type ReviewItem = ItemImageReading & {
   rowId: string;
   include: boolean;
 };
+
+
+/** Longest edge, in pixels, that an uploaded photo is scaled down to. */
+export const MAX_IMAGE_EDGE = 1024;
+
+/** How many photos may be read in one go. */
+export const MAX_PHOTOS = 6;
+
+/**
+ * Scales a chosen file down and returns bare base64 JPEG, which is what the
+ * identify endpoint expects. Full-resolution phone photos are far larger than
+ * the model needs and slow the request down for no gain in legibility.
+ */
+export function normalizeImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      const longestEdge = Math.max(image.naturalWidth, image.naturalHeight);
+
+      if (!longestEdge) {
+        reject(new Error('That file could not be read as an image.'));
+        return;
+      }
+
+      const scale = longestEdge > MAX_IMAGE_EDGE ? MAX_IMAGE_EDGE / longestEdge : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(image.naturalWidth * scale);
+      canvas.height = Math.round(image.naturalHeight * scale);
+
+      const context = canvas.getContext('2d');
+
+      if (!context) {
+        reject(new Error('That file could not be read as an image.'));
+        return;
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      resolve(dataUrl.replace(/^data:image\/jpeg;base64,/, ''));
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('That file could not be read as an image.'));
+    };
+
+    image.src = objectUrl;
+  });
+}
